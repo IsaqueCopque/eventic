@@ -8,7 +8,7 @@ import { ParametroName, TipoRecomendacao } from '@app/common/constants';
 /*
 * Retorna eventos de categorias diversas cujo id não esteja incluso numa lista passada
 */
-const findEventosDiversos = async (numeroEventos : number, skipEventosIds : string[] = []) : Promise<Evento[]> => {
+export const findEventosDiversos = async (numeroEventos : number, skipEventosIds : string[] = []) : Promise<Evento[]> => {
     //seleciona eventos de categorias distintas
     let eventosDiversos = await EventoRepo
         .createQueryBuilder('evento')
