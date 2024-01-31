@@ -90,12 +90,12 @@ async function realizaExperimento(usuario_id : string) : Promise<string>{
         await recommender.initialize_namespace('events');
         const recommenderDataSet = [];
 
-        for(let oroes of avaliacoesOutros){
+        for(let outrosav of avaliacoesOutros){
             recommenderDataSet.push({
                 namespace: 'events',
-                person: oroes.usuario_id,
-                action: oroes.nota >=  4? 'likes' : 'dislikes',
-                thing: oroes.evento_id,
+                person: outrosav.usuario_id,
+                action: outrosav.nota >=  4? 'likes' : 'dislikes',
+                thing: outrosav.evento_id,
                 expires_at: Date.now()+3600000
             })
         }
@@ -116,20 +116,31 @@ async function realizaExperimento(usuario_id : string) : Promise<string>{
         if(recsResult.recommendations.length < 7){
             console.log({ msg: "Recomendou menos de 7" });
         }else{
-            //É preciso remover do resultado os eventos do apreciadosBase, tem de 100% pois usuário avaliou
+            //É preciso remover do resultado os eventos do apreciadosBase, tem precisão 100% pois usuário avaliou
             const recomendacoesLimpas = recsResult.recommendations.filter((rec : any) => !apreciadosBaseIds.includes(rec.thing));
-            //Cálculo da MMR
-            //Posicoes relevants 1 3 5
+            
+            //Posicoes relevantes 1 - 3 - 5
             const relevantes = [apreciadosParaExperimento[0].id,apreciadosParaExperimento[2].id,apreciadosParaExperimento[4].id];
-            let posicao, reciprocalRank:number[] = [];
+            let posicao, reciprocalRank:number[] = [], mAPSum = 0;
+
+            //Cálculo da MMR (1/qt_relevantes)(somatório (1/relevante_rank))
+            //Cálculo da mAP (1/qt_relevantes)(somatório (indice_relevante)/relevante_rank)
             relevantes.forEach((relevante, index) => {
                 posicao = recomendacoesLimpas.findIndex((rec : any) => rec.thing == relevante);
                 if(posicao == -1) posicao = 100000; //não encontrado 
-                reciprocalRank.push(1/(posicao+1)); //posições 1 ... n
+                reciprocalRank.push(1/(posicao+1));
+                mAPSum += (index+1)/posicao;
             });
-            // console.log(reciprocalRank);
             const rrSum = reciprocalRank.reduce((prv, rr)=>prv+rr, 0);
             const mmr = rrSum/relevantes.length;
+            const mAP = mAPSum/relevantes.length;
+            //Cálculo do NDCG DCG/IDCG
+            let dcg = 0, idcg = 0;
+            recomendacoesLimpas.forEach((rec : any,index : number) => {
+                dcg+= (relevantes.includes(rec.thing)? 1 : 0)/Math.log((index+1)+1);
+                idcg+= 1/Math.log((index+1)+1);
+            });
+            const ndcg = dcg /idcg;
 
             //------Imprime Resultado--------------
             // console.log("\nResultado")
@@ -146,7 +157,7 @@ async function realizaExperimento(usuario_id : string) : Promise<string>{
             // console.log("MMR = " + mmr);
             //-------------------------------------
 
-            return `${usuario_id};${reciprocalRank.reduce((prv,rr)=>prv+rr+";", "")}${mmr}\n`
+            return `${usuario_id};${reciprocalRank.reduce((prv,rr)=>prv+rr+";", "")}${mmr};${mAP};${ndcg}\n`
             // return `\n-------\nUsuario = ${usuario_id}\nRECIRPOCAL RANK = ${reciprocalRank} \n MMR = ${mmr}\n`
         }
        
