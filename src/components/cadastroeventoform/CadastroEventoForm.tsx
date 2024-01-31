@@ -30,7 +30,7 @@ export const CadastroEventoForm: FunctionComponent<CadastroEventoFormProps> = (
   const [categorias, setCategorias] = useState<Categoria[]>([]);
 
   useEffect(() => {
-    CategoriaAPI.get({}).then((response) => {
+    CategoriaAPI.getCategorias().then((response) => {
       setCategorias(response);
     });
   }, []);

@@ -30,7 +30,7 @@ export class EventoAPI extends BaseAPI {
      * @param evento 
      * @returns 
      */
-    static async findLast(page: number, limit: number) {
+    static async findLast(page: number, limit: number) : Promise<Evento[]> {
         const res = await fetch(`${this.apiURL}/eventos?page=${page}&limit=${limit}`)
         return await res.json();
     }
@@ -38,6 +38,16 @@ export class EventoAPI extends BaseAPI {
     static async get(eventoId: string): Promise<Evento>{
         const res = await fetch(`${this.apiURL}/eventos?id=${eventoId}`)
 
+        return await res.json();
+    }
+
+    static async getByCategoria(categoriaId: string): Promise<Evento[]>{
+        const res = await fetch(`${this.apiURL}/eventos?categoria_id=${categoriaId}`)
+        return await res.json();
+    }
+
+    static async getByQ(inputValue: string): Promise<Evento[]>{
+        const res = await fetch(`${this.apiURL}/eventos?q=${inputValue}`)
         return await res.json();
     }
 

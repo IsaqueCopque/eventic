@@ -6,17 +6,20 @@ import Image from 'next/image'
 import Link from 'next/link';
 import { RecomendacaoAPI } from '@app/apis/RecomendacaoAPI';
 import { Evento } from '@app/server/entities/evento.entity';
+import { RecomendacaoObj } from '../../../app';
 
-export default function RecommendationSection({recommendationData, inHomePage, mainEvent, userId, tipoRecomendacao} : 
-    {recommendationData : Evento[], inHomePage : boolean, mainEvent : Evento, userId : string, tipoRecomendacao : number}){
+export default function RecommendationSection({recommendationData, inHomePage, mainEvent, userId} : 
+    {recommendationData : RecomendacaoObj, inHomePage : boolean, mainEvent : Evento, userId : string}){
 
     //Indica se já foi persistida uma recomendação para a instância de recomendação atual
     // const [recAlredyStored, setRecAlredyStored] = useState(false);
     const [recommendationId, setRecommendationId] = useState(null);
+    const tipoRecomendacao = recommendationData.tipoRecomendacao;
+    const recomendados = recommendationData.recommendations;
 
     const storeRec = async (nota : number) => {
         if(!recommendationId){
-            let res = await RecomendacaoAPI.cadastrar(userId, tipoRecomendacao, nota, recommendationData.map(evento => evento.id));                        
+            let res = await RecomendacaoAPI.cadastrar(userId, tipoRecomendacao, nota, recomendados.map(evento => evento.id));                        
             // setRecAlredyStored(true);
             setRecommendationId(res.id);
         }else{
@@ -26,8 +29,8 @@ export default function RecommendationSection({recommendationData, inHomePage, m
 
     if(inHomePage){ //Seção de recomendação na home page
 
-        while(recommendationData.length > 4)//limita a 4 eventos
-            recommendationData.pop()
+        while(recomendados.length > 4)//limita a 4 eventos
+            recomendados.pop()
 
         return(
             <Box sx={{ borderRadius: '0.3rem', backgroundColor: 'white', padding: '1rem', boxShadow: 3, maxHeight: "220px" }}>
@@ -36,7 +39,7 @@ export default function RecommendationSection({recommendationData, inHomePage, m
                 </Typography>
                 <Grid container spacing={3}>
                     {
-                        recommendationData.map((rec) =>(
+                        recomendados.map((rec) =>(
                         <Grid item xs={3} key={rec.id} title={rec?.titulo} >
                             <Link href={{ pathname: '/eventos/detalhes',query: {id: rec.id}}}>
                                 <Card sx={{ display: 'flex', boxShadow: 3, 
@@ -62,8 +65,8 @@ export default function RecommendationSection({recommendationData, inHomePage, m
     }
 
     //se na seção de detalhes do evento
-    while(recommendationData.length > 5)//limita a 5 eventos
-            recommendationData.pop()
+    while(recomendados.length > 5)//limita a 5 eventos
+        recomendados.pop()
 
     return(
         <Grid item md={12}>
@@ -74,9 +77,9 @@ export default function RecommendationSection({recommendationData, inHomePage, m
 
                 {/* <Grid container spacing={3} */}
 
-                {recommendationData.length != 0?
+                {recomendados.length != 0?
                     <Grid container justifyContent={"space-evenly"}>
-                        {recommendationData.map((rec) => <RecommendedEventCard key={rec.id} eventData={rec} userId={userId} storeRec={storeRec} /> )}
+                        {recomendados.map((rec) => <RecommendedEventCard key={rec.id} eventData={rec} userId={userId} storeRec={storeRec} /> )}
                     </Grid>
                 :
                 <Typography variant='body1'>

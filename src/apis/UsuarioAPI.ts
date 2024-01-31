@@ -1,3 +1,4 @@
+import { UsuarioPostRequest, UsuarioPutRequest } from "../../app";
 import { BaseAPI } from "./BaseAPI";
 
 export class UsuarioAPI extends BaseAPI {
@@ -19,7 +20,14 @@ export class UsuarioAPI extends BaseAPI {
             body: JSON.stringify(usuario),
             headers: {"Content-type": "application/json; charset=UTF-8"}
         })
+        return response.json();
+    }
 
+    /*
+     Obtém eventos em que o usuário logado se inscreveu
+    */
+    static async getEventosInscritosUsuarioLogado(){
+        const response = await fetch(`${this.apiURL}/usuarios/eventos`);
         return response.json();
     }
 }

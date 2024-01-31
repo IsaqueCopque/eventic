@@ -23,7 +23,7 @@ import Link from "next/link";
 
 import MyIcon from './logoCalendar.svg';
 import ReviewSection from "@app/components/reviewSection";
-import { AvaliacaoData, Evento } from "../../../app";
+import { AvaliacaoData, Evento, RecomendacaoObj } from "../../../app";
 
 const CustomIcon = (props: React.ComponentProps<typeof SvgIcon>) => (
   <SvgIcon {...props}>
@@ -32,8 +32,8 @@ const CustomIcon = (props: React.ComponentProps<typeof SvgIcon>) => (
 );
 
 
-function EventDetails({ eventoData, avaliacaoData, recomendadosData, tipoRecomendacao } : 
-  { eventoData: Evento[], avaliacaoData: AvaliacaoData[], recomendadosData : Evento[],tipoRecomendacao : number }) {
+function EventDetails({ eventoData, avaliacaoData, recomendacaoData } : 
+  { eventoData: Evento[], avaliacaoData: AvaliacaoData[], recomendacaoData : RecomendacaoObj}) {
 
   const [isLoading, setIsLoading] = useState(false);
 
@@ -201,9 +201,8 @@ function EventDetails({ eventoData, avaliacaoData, recomendadosData, tipoRecomen
         </Grid>
 
         {/* @ts-ignore */}
-        <RecommendationSection recommendationData = { recomendadosData }  mainEvent = {eventoData[0]}
+        <RecommendationSection recommendationData = { recomendacaoData }  mainEvent = {eventoData[0]}
           inHomePage={false}
-          tipoRecomendacao = {tipoRecomendacao}
           userId = {session.data?.user.id? session.data.user.id : ''}
           />
        
@@ -239,8 +238,7 @@ export const getServerSideProps: GetServerSideProps = async ({ query, req,res })
     props: {
       eventoData,
       avaliacaoData,
-      recomendadosData: responseData.recommendations,
-      tipoRecomendacao: responseData.tipoRecomendacao
+      recomendacaoData: responseData,
     },
   };
 };

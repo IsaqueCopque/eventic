@@ -1,89 +1,42 @@
-import { Box, Container, Grid, FormControl, InputLabel, MenuItem, TextField, InputAdornment, Button, IconButton, Paper, InputBase } from "@mui/material";
-import Tab from '@mui/material/Tab';
+import EventCard from "@app/components/eventcard";
+import EventList from "@app/components/eventlist";
+import SearchIcon from '@mui/icons-material/Search';
+import ViewListIcon from '@mui/icons-material/ViewList';
+import ViewModuleIcon from '@mui/icons-material/ViewModule';
 import TabContext from '@mui/lab/TabContext';
 import TabList from '@mui/lab/TabList';
 import TabPanel from '@mui/lab/TabPanel';
-import EventList from "@app/components/eventlist";
-import EventCard from "@app/components/eventcard";
-import Typography from "@mui/material/Typography";
-import { useEffect, useState } from "react";
-import ViewListIcon from '@mui/icons-material/ViewList';
-import ViewModuleIcon from '@mui/icons-material/ViewModule';
-import SearchIcon from '@mui/icons-material/Search';
+import { Box, Button, FormControl, Grid, IconButton, InputBase, InputLabel, MenuItem, Paper } from "@mui/material";
 import Select, { SelectChangeEvent } from '@mui/material/Select';
+import Tab from '@mui/material/Tab';
+import Typography from "@mui/material/Typography";
+import moment from 'moment';
+import 'moment/locale/pt-br';
+import { useEffect, useState } from "react";
+import { useRouter } from "next/router";
 
-
-import Image from 'next/image';
+import { getCookie, setCookie } from '@app/utils/cookieUtils';
 import CircularProgress from '@mui/material/CircularProgress';
 import useMediaQuery from '@mui/material/useMediaQuery';
-import { setCookie, getCookie } from '@app/utils/cookieUtils';
-import { EventoAPI } from '@app/apis/EventoAPI';
 
-import { criaListaCategorias } from '@app/utils/organizaEventos';
+import { UsuarioAPI } from "@app/apis/UsuarioAPI";
+import { Categoria, EventoComRecomendacoes, PeriodosComEventosRecomendacoes } from '../../../app';
 import RecommendationSection from '../recommendationSection';
-import { Categoria, EventoPorCategoriaRecomendacao, EventoPorPeriodoRecomendacao, EventoRecomendacao, ListaCategorias } from '../../../app';
-import { Evento } from '@app/server/entities/evento.entity';
 
+export default function Home({ eventos, categorias, home, userId }: { eventos: EventoComRecomendacoes[], categorias: Categoria[], home: boolean, userId : string | null }) {
 
-export default function Home({ data, categorias, eventosCategoria, home, userId }: { data?: EventoRecomendacao[], categorias?: Categoria[], eventosCategoria?: Array<EventoPorCategoriaRecomendacao>, home: boolean, userId : string | null }) {
+    const router = useRouter();
 
-    // Cria listas de eventos para cada categoria
-    const listaVazia: ListaCategorias =
-    {
-        Todas: {
-            eventosPorDiaAnteriores: [
-                {
-                    nome: '',
-                    eventos: []
-                }
-            ],
-            eventosPorDiaNovos: [
-                {
-                    nome: '',
-                    eventos: []
-                }
-            ],
-            eventosPorSemanaAnteriores: [
-                {
-                    nome: '',
-                    eventos: []
-                }
-            ],
-            eventosPorSemanaNovos: [
-                {
-                    nome: '',
-                    eventos: []
-                }
-            ],
-            eventosPorMesAnteriores: [
-                {
-                    nome: '',
-                    eventos: []
-                }
-            ],
-            eventosPorMesNovos: [
-                {
-                    nome: '',
-                    eventos: []
-                }
-            ],
-        }
-    }
-
-    let [listaCategorias, setListaCategorias] = useState((data && categorias && eventosCategoria && home) ? criaListaCategorias(eventosCategoria, data) : listaVazia);
-    const listaCategoriasBackup = (data && categorias && eventosCategoria && home) ? criaListaCategorias(eventosCategoria, data) : listaVazia
-
-    // Controla os filtros categoria e periodo
-    const [category, setCategory] = useState('Todas');
-    const [period, setPeriod] = useState('1');
+    // Controla o filtro de periodo
+    const [periodo, setPeriodo] = useState('1');
 
     // Controla a visualização lista/card
     const [listView, setListView] = useState(false)
 
     // Controla as abas Novos/Anteriores
     const [aba, setAba] = useState('1')
-    const [eventToMapOld, setEventToMapOld] = useState(listaCategorias['Todas'].eventosPorDiaAnteriores)
-    const [eventToMapNew, setEventToMapNew] = useState(listaCategorias['Todas'].eventosPorDiaNovos)
+    const [eventosPosteriores, setEventosPosteriores] = useState<PeriodosComEventosRecomendacoes[]>([]);
+    const [eventosAnteriores, setEventosAnteriores] = useState<PeriodosComEventosRecomendacoes[]>([]);
 
     // Controla o valor do campo de pesquisa
     const [inputValue, setInputValue] = useState('');
@@ -91,7 +44,7 @@ export default function Home({ data, categorias, eventosCategoria, home, userId 
     // Roda a roda de loading enquanto espera o resultado da busca
     const [isLoading, setIsLoading] = useState(false);
 
-    // Roda a roda de loading enquanto espera carrega o estado do evento, se esta ou nao inscrito
+    // Roda a roda de loading enquanto espera carregar o estado do evento, se esta ou nao inscrito
     const [isLoadingSubButton, setIsLoadingSubButton] = useState(false);
 
     // Loading meus eventos
@@ -100,167 +53,106 @@ export default function Home({ data, categorias, eventosCategoria, home, userId 
     // Controla a lista de eventos inscritos
     let [idIncricoes, setIdIncricoes] = useState<string[]>([])
 
-    // Atualiza os eventos exibidos ao pesquisar
-    useEffect(() => {
-        if (listaCategorias) {
-            console.log(listaCategorias)
-            update()
-        }
-    }, [listaCategorias]);
+    moment.locale('pt-br');
 
-    useEffect(() => {
-        if (idIncricoes) {
-            console.log('carregando inscricoes')
-        }
-    }, [idIncricoes]);
+    function ordenaEventosPorPeriodo(valorPeriodo : string) : void{
+        //Ordena os eventos da aba selecionada,anteriores ou posteriores
+        let nomePeriodo : string;
 
-    // Ao carregar o componente, tenta recuperar os valores das variáveis do cookie
-    useEffect(() => {
-        const list = getCookie('listView')
-        const savedlistView = list ? JSON.parse(list) : false;
+        let eventosOrdenados =  aba == '1'?
+            eventos.filter(evento => new Date(evento.evento.dataInicial).getTime() >= Date.now())
+            :
+            eventos.filter(evento => new Date(evento.evento.dataInicial).getTime() < Date.now());
 
-        const savedPeriod = getCookie('period');
+        eventosOrdenados = eventosOrdenados.sort((a :EventoComRecomendacoes , b : EventoComRecomendacoes) => new Date(a.evento.dataInicial).getTime() - new Date(b.evento.dataInicial).getTime())
 
-        if (savedlistView) {
-            setListView(savedlistView);
-        }
+        const periodosMap =  new Map<string,EventoComRecomendacoes[]>();
 
-        if (savedPeriod) {
-            setPeriod(savedPeriod);
-            update(savedPeriod)
-        }
-        if (!home) {
-            handleUserEvents()
-        }
-
-        getUserEvents()
-    }, []);
-
-    function update(periodo: string = period) {
-        if (periodo == '3') {
-            setEventToMapOld(listaCategorias[category].eventosPorMesAnteriores);
-            setEventToMapNew(listaCategorias[category].eventosPorMesNovos);
-        }
-        if (periodo == '2') {
-            setEventToMapOld(listaCategorias[category].eventosPorSemanaAnteriores);
-            setEventToMapNew(listaCategorias[category].eventosPorSemanaNovos);
-        }
-        if (periodo == '1') {
-            setEventToMapOld(listaCategorias[category].eventosPorDiaAnteriores);
-            setEventToMapNew(listaCategorias[category].eventosPorDiaNovos);
-        }
-    }
-
-    function handlePeriodChange(event: SelectChangeEvent) {
-        const evento = event.target.value
-        setPeriod(event.target.value)
-        if (evento == '3') {
-            setEventToMapOld(listaCategorias[category].eventosPorMesAnteriores);
-            setEventToMapNew(listaCategorias[category].eventosPorMesNovos);
-        }
-        if (evento == '2') {
-            setEventToMapOld(listaCategorias[category].eventosPorSemanaAnteriores);
-            setEventToMapNew(listaCategorias[category].eventosPorSemanaNovos);
-        }
-        if (evento == '1') {
-            setEventToMapOld(listaCategorias[category].eventosPorDiaAnteriores);
-            setEventToMapNew(listaCategorias[category].eventosPorDiaNovos);
-        }
-        setCookie('period', evento);
-    }
-
-    function handleCategoryChange(event: SelectChangeEvent) {
-        const evento = event.target.value
-        setCategory(evento)
-        if (period == '3') {
-            setEventToMapOld(listaCategorias[evento].eventosPorMesAnteriores);
-            setEventToMapNew(listaCategorias[evento].eventosPorMesNovos);
-        }
-        if (period == '2') {
-            setEventToMapOld(listaCategorias[evento].eventosPorSemanaAnteriores);
-            setEventToMapNew(listaCategorias[evento].eventosPorSemanaNovos);
-        }
-        if (period == '1') {
-            setEventToMapOld(listaCategorias[evento].eventosPorDiaAnteriores);
-            setEventToMapNew(listaCategorias[evento].eventosPorDiaNovos);
-        }
-    }
-
-    // Faz a busca na api 
-    const handleClick = async () => {
-        setIsLoading(true)
-
-        const api = process.env.NEXT_PUBLIC_URL
-
-        // Pega os Eventos
-        const res = await fetch(`${api}/api/eventos?q=${inputValue}`)
-        const data = await res.json()
-
-        // Pega os Eventos por Categoria
-        const eventosCategoria = []
-        if (categorias) {
-            for (const categoria of categorias) {
-                const res = await fetch(`${api}/api/eventos?categoria_id=${categoria.id}&q=${inputValue}`);
-                const newData : Evento[] = await res.json();
-                // const eventosRecs : EventoRecomendacao[] = await newData.map( async (evento: Evento) : Promise<EventoRecomendacao> => {
-                //     const recs : Evento[] =  userId != null?
-                //     await EventoAPI.getRecomendacoes(evento.id, userId) 
-                //     : 
-                //     await EventoAPI.getRecomendacoes(evento.id, null);
-                //     return {evento: evento, recomendacoes: recs};
-                // })
-                // eventosCategoria.push({ nome: categoria.nome, eventos: eventosRecs })
-                let eventosArray = [];
-                for(let evento of newData){
-                    let recs : Evento[] =  userId != null?
-                    await EventoAPI.getRecomendacoes(evento.id, userId) 
-                    : 
-                    await EventoAPI.getRecomendacoes(evento.id, null);
-                    eventosArray.push({evento: evento, recomendacoes: recs});
-                }
-                eventosCategoria.push({nome: categoria.nome, eventos: eventosArray});
+        if(valorPeriodo == '1')//Por dia
+            periodosMap.set('',eventosOrdenados);
+        else if(valorPeriodo == '2'){//Por semana
+            let dataInicioSemana, dataFimSemana;
+            let semana;
+            for(let evento of eventosOrdenados){
+                dataInicioSemana = moment(evento.evento.dataInicial).startOf('week').format('D [de] MMMM');
+                dataFimSemana = moment(evento.evento.dataInicial).add(6, 'days').format('D [de] MMMM');
+                nomePeriodo = `Semana de ${dataInicioSemana} a ${dataFimSemana}`;
+                semana = periodosMap.get(nomePeriodo);
+                if(semana)
+                    periodosMap.set(nomePeriodo, semana.concat(evento));
+                else 
+                    periodosMap.set(nomePeriodo,[evento]);
+            }
+        }else if(valorPeriodo == '3'){//Por mês
+            let mes;
+            for(let evento of eventosOrdenados){
+                nomePeriodo = moment(evento.evento.dataInicial).format('MMMM YYYY');
+                mes = periodosMap.get(nomePeriodo);
+                if(mes)
+                    periodosMap.set(nomePeriodo, mes.concat(evento));
+                else 
+                    periodosMap.set(nomePeriodo,[evento]);
             }
         }
 
-        setListaCategorias(criaListaCategorias(eventosCategoria, data))
-        setIsLoading(false)
-    };
+        const eventosPorPeriodos : PeriodosComEventosRecomendacoes[] = [];
+        periodosMap.forEach((valor,chave) => eventosPorPeriodos.push({periodo: chave, eventosRecomendacoes: valor}));
 
-    // Mostra somente os eventos do usuario se ele estiver na pagina Minhas inscricoes
-    const handleUserEvents = async () => {
-        setIsLoadingMeusEventos(true)
-        const api = process.env.NEXT_PUBLIC_URL
-
-        // Pega os Eventos do usuario
-        const res = await fetch(`${api}/api/usuarios/eventos`)
-        const data = await res.json()
-
-        const eventosCategoria = [{ nome: '', eventos: [] }]
-
-        setListaCategorias(criaListaCategorias(eventosCategoria, data))
-        setIsLoadingMeusEventos(false)
+        if(aba == '1')
+            setEventosPosteriores(eventosPorPeriodos);
+        else
+            setEventosAnteriores(eventosPorPeriodos);
     }
 
-    const getUserEvents = async () => {
+    // Ao carregar o componente
+    useEffect(() => {
+        //Recupera os valores de opções de visualização das variáveis do cookie
+        const list = getCookie('listView')
+        const savedlistView = list ? JSON.parse(list) : false;
+        const savedPeriod = getCookie('periodo')
+        if (savedlistView) 
+            setListView(savedlistView);
+        if (savedPeriod) 
+            setPeriodo(savedPeriod);
+
+        //Divide por período
+        ordenaEventosPorPeriodo(savedPeriod || periodo);
+        //Obtém ids dos eventos avalidos pelo usuário
+        getUsuarioEventosIds();
+        // console.log(eventosAnteriores.length);
+        // console.log(eventosPosteriores.length)
+    }, []);
+
+    function handlePeriodChange(event: SelectChangeEvent) {
+        const novoPeriodo = event.target.value;
+        setPeriodo(novoPeriodo);
+        ordenaEventosPorPeriodo(novoPeriodo);
+        setCookie('periodo', novoPeriodo);
+    }
+
+    function handleCategoriaChange(event: SelectChangeEvent) {
+        const idCategoria = event.target.value;
+        router.push(`/eventos?categoriaId=${idCategoria}`);
+    }
+
+    // Redireciona para fazer busca na api
+    const handleClick = async () => {
+        router.push(`/eventos?q=${inputValue}`);
+    };
+
+    //Obtém Ids dos eventos que o usuário logado se inscreveu
+    const getUsuarioEventosIds = async () => {
         setIsLoadingSubButton(true)
-        const api = process.env.NEXT_PUBLIC_URL;
-
-        // Pega os Eventos do usuário
-        const res = await fetch(`${api}/api/usuarios/eventos`);
-        const data: Promise<Evento[] | { errorMsg: string }> = await res.json();
-
-
+        const res =  await UsuarioAPI.getEventosInscritosUsuarioLogado();
         let listId: string[] = []
-        if (Array.isArray(data)) {
-            listId = data.map(evento => evento.id)
+        if (Array.isArray(res)) {
+            listId = res.map(evento => evento.id)
         }
         setIdIncricoes(listId)
         setIsLoadingSubButton(false)
     };
 
-
     function limpaBusca() {
-        setListaCategorias(listaCategoriasBackup)
         setInputValue('')
     }
 
@@ -271,38 +163,36 @@ export default function Home({ data, categorias, eventosCategoria, home, userId 
         }
     };
 
-
-    const events = (eventList: Array<EventoPorPeriodoRecomendacao>, hasSubscribeButton: boolean) =>
+    const events = (eventList: PeriodosComEventosRecomendacoes[], hasSubscribeButton: boolean) =>
     (
         eventList.map((eventoPeriodoRec) =>
-            <div key={eventoPeriodoRec.nome}>
+            <div key={eventoPeriodoRec.periodo}>
                 {listView ?
-                    <div key={eventoPeriodoRec.nome}>
-                        <Typography variant="h5" mt={8} mb={3}>{eventoPeriodoRec.nome}</Typography>
-                        {eventoPeriodoRec.eventos.map((card) =>
-                            <div key={eventoPeriodoRec.nome}>
-                                <EventList isLoadingSubButton={isLoadingSubButton} idIncricoes={idIncricoes} setIdIncricoes={setIdIncricoes} inscrito={idIncricoes.includes(card.evento.id)} key={card.evento.id} eventoId={card.evento.id} id={card.evento.id} subscribeButton={hasSubscribeButton} title={card.evento.titulo} location={card.evento.localizacao} initialDate={card.evento.dataInicial}  />
+                    <div key={eventoPeriodoRec.periodo}>
+                        <Typography variant="h5" mt={8} mb={3}>{eventoPeriodoRec.periodo}</Typography>
+                        {eventoPeriodoRec.eventosRecomendacoes.map((eventoRec) =>
+                            <div key={eventoRec.evento.id}>
+                                <EventList isLoadingSubButton={isLoadingSubButton} idIncricoes={idIncricoes} setIdIncricoes={setIdIncricoes} inscrito={idIncricoes.includes(eventoRec.evento.id)} key={eventoRec.evento.id} eventoId={eventoRec.evento.id} id={eventoRec.evento.id} subscribeButton={hasSubscribeButton} title={eventoRec.evento.titulo} location={eventoRec.evento.localizacao} initialDate={eventoRec.evento.dataInicial}  />
                             </div>
                         )}
                     </div> 
                     :
-                    <div key={eventoPeriodoRec.nome}>
-                        <Typography variant="h5" mt={8} mb={3}>{eventoPeriodoRec.nome}</Typography>
+                    <div key={eventoPeriodoRec.periodo}>
+                        <Typography variant="h5" mt={8} mb={3}>{eventoPeriodoRec.periodo}</Typography>
 
 
                         {/* Recomendações apenas para eventos futuros */}
                         {aba == '1'? 
                             // Eventos FUTUROS
                             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '1rem'}}>
-                                {eventoPeriodoRec.eventos.map((card) =>
+                                {eventoPeriodoRec.eventosRecomendacoes.map((eventoRec) =>
                                     (
-                                    <Grid container direction="row" alignItems="center" spacing={2} key={card.evento.id}> 
+                                    <Grid container direction="row" alignItems="center" spacing={2} key={eventoRec.evento.id}> 
                                         <Grid item  xs={4}>
-                                            <EventCard isLoadingSubButton={isLoadingSubButton} idIncricoes={idIncricoes} setIdIncricoes={setIdIncricoes} inscrito={idIncricoes.includes(card.evento.id)} key={card.evento.id} eventoId={card.evento.id} id={card.evento.id} subscribeButton={hasSubscribeButton} image={card.evento.imagemUrl} title={card.evento.titulo} location={card.evento.localizacao} initialDate={card.evento.dataInicial} />
+                                            <EventCard isLoadingSubButton={isLoadingSubButton} idIncricoes={idIncricoes} setIdIncricoes={setIdIncricoes} inscrito={idIncricoes.includes(eventoRec.evento.id)} key={eventoRec.evento.id} eventoId={eventoRec.evento.id} id={eventoRec.evento.id} subscribeButton={hasSubscribeButton} image={eventoRec.evento.imagemUrl} title={eventoRec.evento.titulo} location={eventoRec.evento.localizacao} initialDate={eventoRec.evento.dataInicial} />
                                         </Grid>
                                         <Grid item xs={8}>
-                                            {/* @ts-ignore */}
-                                            <RecommendationSection recommendationData={card.recomendacoes.recommendations} inHomePage={true} mainEvent={card.evento} userId = {''} tipoRecomendacao={0}/>
+                                            <RecommendationSection recommendationData={eventoRec.recomendacoes} inHomePage={true} mainEvent={eventoRec.evento} userId = {''}/>
                                         </Grid>
                                     </Grid>
                                     )
@@ -312,10 +202,10 @@ export default function Home({ data, categorias, eventosCategoria, home, userId 
                             :
                             //Eventos Anteriores
                             <Grid container direction="row" alignItems="center" spacing={2}>
-                                {eventoPeriodoRec.eventos.map((card) =>
+                                {eventoPeriodoRec.eventosRecomendacoes.map((eventoRec) =>
                                     (
-                                        <Grid item xs={4} key={card.evento.id}>
-                                            <EventCard isLoadingSubButton={isLoadingSubButton} idIncricoes={idIncricoes} setIdIncricoes={setIdIncricoes} inscrito={idIncricoes.includes(card.evento.id)} key={card.evento.id} eventoId={card.evento.id} id={card.evento.id} subscribeButton={hasSubscribeButton} image={card.evento.imagemUrl} title={card.evento.titulo} location={card.evento.localizacao} initialDate={card.evento.dataInicial} />
+                                        <Grid item xs={4} key={eventoRec.evento.id}>
+                                            <EventCard isLoadingSubButton={isLoadingSubButton} idIncricoes={idIncricoes} setIdIncricoes={setIdIncricoes} inscrito={idIncricoes.includes(eventoRec.evento.id)} key={eventoRec.evento.id} eventoId={eventoRec.evento.id} id={eventoRec.evento.id} subscribeButton={hasSubscribeButton} image={eventoRec.evento.imagemUrl} title={eventoRec.evento.titulo} location={eventoRec.evento.localizacao} initialDate={eventoRec.evento.dataInicial} />
                                         </Grid>
                                     )
                                     )
@@ -366,7 +256,7 @@ export default function Home({ data, categorias, eventosCategoria, home, userId 
                             inputProps={{ MenuProps: { disableScrollLock: true } }}
                             labelId="demo-simple-select-label"
                             id="demo-simple-select"
-                            value={period}
+                            value={periodo}
                             label="Período"
                             onChange={handlePeriodChange}
                         >
@@ -382,14 +272,13 @@ export default function Home({ data, categorias, eventosCategoria, home, userId 
                                 inputProps={{ MenuProps: { disableScrollLock: true } }}
                                 labelId="demo-simple-select-label"
                                 id="demo-simple-select"
-                                value={category}
+                                value={"Todas"}
                                 label="Categoria"
-                                // onChange={(event: SelectChangeEvent) => (setCategory(event.target.value))}
-                                onChange={handleCategoryChange}
+                                onChange={handleCategoriaChange}
                             >
                                 <MenuItem value='Todas'>Todas</MenuItem>
                                 {categorias && categorias.map((categoria) =>
-                                    <MenuItem key={categoria.id} value={categoria.nome}>{categoria.nome}</MenuItem>
+                                    <MenuItem key={categoria.id} value={categoria.id}>{categoria.nome}</MenuItem>
                                 )}
                             </Select>
                         </FormControl>
@@ -415,17 +304,16 @@ export default function Home({ data, categorias, eventosCategoria, home, userId 
                             </Box>
 
                             <TabPanel sx={{ padding: 0 }} value='0'>
-                                {events(eventToMapOld, false)}
+                                {events(eventosAnteriores, false)}
                             </TabPanel>
 
                             <TabPanel sx={{ padding: 0 }} value='1'>
-                                {events(eventToMapNew, true)}
+                                {events(eventosPosteriores, true)}
                             </TabPanel>
                         </TabContext>
                     </Box>)
                 }
             </Box>
         </Box>
-
     )
 }
