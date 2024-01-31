@@ -143,4 +143,10 @@ interface AvaliacaoData{
     evento : {id: string, descricao: string, titulo: string}
 }
 
+interface ObjetoAvaliacao{
+    usuario_id : string,
+    evento_id : string,
+    nota : number
+}
+
 type Permissao = 'admin'| 'servidor' | 'visitante';
