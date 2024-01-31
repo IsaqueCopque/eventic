@@ -5,6 +5,8 @@ import {In, Not} from 'typeorm'
 import { Evento } from '@app/server/entities/evento.entity';
 import { ParametroName, TipoRecomendacao } from '@app/common/constants';
 
+const QT_AVALIADORES = 4, QT_OUTRAS_AVALIACOES = 6;
+
 /*
 * Retorna eventos de categorias diversas cujo id não esteja incluso numa lista passada
 */
@@ -60,10 +62,11 @@ export default async function handler(
         if(evento_id){
             evento_id = evento_id as string;
             let evento = await EventoRepo.findOne({where: {id:evento_id}}) as Evento;
+            
             const avaliacoesEvento = await AvaliacaoRepo.createQueryBuilder('avaliacao')
             .leftJoinAndSelect('avaliacao.usuario', 'usuario')
             .where('avaliacao.evento_id = :id_evento', { id_evento: evento_id })
-            .limit(6)  //Limitado para 6 avaliadores
+            .limit(QT_AVALIADORES)  //Limitado quantidade avaliadores
             .getMany();
 
             // const avaliacoesEvento = await AvaliacaoRepo.find(
@@ -93,7 +96,7 @@ export default async function handler(
                 .leftJoinAndSelect("avaliacao.evento", "evento")
                 .leftJoinAndSelect("avaliacao.usuario", "usuario")
                 .where('avaliacao.usuario_id IN (:...ids)', { ids: usuariosIds })
-                .limit(4) //busca apenas 4 outras avaliações de cada usuário
+                .limit(QT_OUTRAS_AVALIACOES) //limita outras avaliações de cada usuário
                 .getMany();
 
             // const avaliacoesGeral = await AvaliacaoRepo.find(
