@@ -13,15 +13,14 @@ export default async function handler(
         let { usuario_id } = req.query;
 
         if (!usuario_id) { //Busca usuários do banco para experimentar
-            //Pelo menos tenha avaliado 20 eventos
+            //Pelo menos tenha avaliado 10 eventos
             const usuariosIds = await AvaliacaoRepo
                 .createQueryBuilder('avaliacao')
                 .select('avaliacao.usuario_id')
                 .groupBy('avaliacao.usuario_id')
-                .having('COUNT(avaliacao.usuario_id) >= :count', { count: 20 })
-                .limit(20)
+                .having('COUNT(avaliacao.usuario_id) >= :count', { count: 10 })
                 .getRawMany();
-            let results, text = "Usuario;precision@3;precision@5;precision@10;MAP@3;MAP@5;MAP@10;MMR@3;MMR@5;MMR@10;NDCG@3;NDCG@5;NDCG@10\n";
+            let results, text = "Usuario;precision@3;precision@5;precision@10;MAP@3;MAP@5;MAP@10;MRR@3;MRR@5;MRR@10;NDCG@3;NDCG@5;NDCG@10\n";
             let medias = [0,0,0,0,0,0,0,0,0,0,0,0], accResults = 0;
             for (let id of usuariosIds) {
                 results = await realizaExperimento(id.usuario_id);
@@ -134,9 +133,6 @@ async function realizaExperimento(usuario_id: string): Promise<{ usuario_id: str
             * Calcular MAP,MRR,MDCG e Precision@ para as posições 3,5 e 10
             */
             const posicoes = [3, 5, 10];
-            //    let posicoesDosRelevantes : number[] = itensRelevantes.map(
-            //         (relevante) => recomendacoesLimpas.findIndex(
-            //             (rec : any) => rec.thing == relevante) +1);
 
             let mapsResults: number[] = [], mapSum: number;
             let mrrResults = [];
@@ -177,68 +173,6 @@ async function realizaExperimento(usuario_id: string): Promise<{ usuario_id: str
                 mrr3: mrrResults[0], mrr5: mrrResults[1], mrr10: mrrResults[2],
                 ndgc3: ndcgResults[0], ndgc5: ndcgResults[1], ndgc10: ndcgResults[2]
             }
-
-
-            // const relevantes = [//Posicoes relevantes 1 - 3 - 5
-            //     apreciadosParaExperimento[0].id,
-            //     apreciadosParaExperimento[2].id,
-            //     apreciadosParaExperimento[4].id
-            // ];
-            // let posicoesDosRelevantes : number[] = [];
-            // let posicao : number, reciprocalRank:number[] = [];
-
-            // //Busca posições dos relevantes e ranks reciprocos
-            // relevantes.forEach((relevante,index) => {
-            //     posicao = recomendacoesLimpas.findIndex((rec : any) => rec.thing == relevante) + 1;
-            //     posicoesDosRelevantes.push(posicao);
-            //     reciprocalRank.push(posicao != 0? (1/posicao) : 0);
-            // });
-
-            // //Calcula precisões 1-3-5
-            // const precisoes = [
-            //     posicoesDosRelevantes.filter(posi => posi<=1 && posi!= 0).length/1,
-            //     posicoesDosRelevantes.filter(posi => posi<=3 && posi!= 0).length/3,
-            //     posicoesDosRelevantes.filter(posi => posi<=5 && posi!= 0).length/5
-            // ];
-
-            // //Cálculo MRR
-            // const rrSum = reciprocalRank.reduce((prv, rr)=>prv+rr, 0);
-            // const mrr = rrSum/relevantes.length;
-
-            // //Cálculo mAP
-            // //Posições precisam estar em ordem
-            // posicoesDosRelevantes = posicoesDosRelevantes.sort();
-            // let mAPSum = 0, relevantesEncontrados = 0;
-            // posicoesDosRelevantes.forEach((posi) => {
-            //     if(posi!=0){
-            //         relevantesEncontrados += 1;
-            //         mAPSum += relevantesEncontrados/posi;
-            //     }
-            // });
-            // const mAP = mAPSum/relevantes.length;
-
-            // //Cálculo do NDCG DCG/IDCG
-            // let dcg = 0, idcg = 0;
-            // recomendacoesLimpas.forEach((rec : any,index : number) => {
-            //     dcg+= (relevantes.includes(rec.thing)? 1 : 0)/Math.log((index+1)+1);
-            //     idcg+= 1/Math.log((index+1)+1);
-            // });
-            // const ndcg = dcg /idcg;
-
-            //------Imprime Resultado--------------
-            // console.log("\nResultado")
-            // console.log(recsResult);
-            // console.log("\n///////////////\n")
-            // recsResult.recommendations.forEach((res,index) => {
-            //     console.log(`#${index+1} ${res.thing}`);
-            //     console.log(`Peso ${res.weight}\nPessoas = `);
-            //     console.log(res.people);
-            // })
-            //-------------------------------------
-
-            // return `${usuario_id};${precisoes.reduce((prv,p)=>prv+p+";", "")}${mrr};${mAP};${ndcg}\n`;
-            // return `${usuario_id};${precisoes.reduce((prv,p)=>prv+p+";", "")}${mrr};${mAP};${ndcg};${posicoesDosRelevantes.reduce((prv,p)=>prv+p+";", "")}\n`;
-            // return `${usuario_id};${reciprocalRank.reduce((prv,rr)=>prv+rr+";", "")}${mrr};${mAP};${ndcg};${posicoesDosRelevantes.reduce((prv,rr)=>prv+rr+"|", "")}\n`;
         }
 
     }
