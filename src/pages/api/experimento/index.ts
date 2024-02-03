@@ -1,9 +1,28 @@
 import { AvaliacaoRepo, EventoRepo, UsuarioRepo } from '@app/server/database';
 import { Avaliacao } from '@app/server/entities/avaliacao.entity';
+import { Evento } from '@app/server/entities/evento.entity';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { ObjetoAvaliacao } from '../../../../app';
+import Cosine from "string-comparison"
 const ger = require('ger');
 const fs = require('fs');
+
+interface TiposMetricas{
+    map3: number, map5: number, map10: number,
+    mrr3: number, mrr5: number, mrr10: number,
+    ndgc3: number, ndgc5: number, ndgc10: number
+}
+
+interface Metricas{
+    usuario_id: string,
+    simCosseno : TiposMetricas,
+    fc: TiposMetricas,
+    hibrido: TiposMetricas
+}
+
+const stopWords = ['i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves', 'you', 'your', 'yours', 'yourself', 'yourselves','he', 'him', 'his', 'himself', 'she', 'her', 'hers', 'herself', 'it', 'its', 'itself', 'they', 'them', 'their',  'theirs', 'themselves', 'what', 'which', 'who', 'whom', 'this', 'that', 'these', 'those', 'am', 'is', 'are', 'was',  'were', 'be', 'been', 'being', 'have', 'has', 'had', 'having', 'do', 'does', 'did', 'doing', 'a', 'an', 'the', 'and',  'but', 'if', 'or', 'because', 'as', 'until', 'while', 'of', 'at', 'by', 'for', 'with', 'about', 'against', 'between',  'into', 'through', 'during', 'before', 'after', 'above', 'below', 'to', 'from', 'up', 'down', 'in', 'out', 'on', 'off',  'over', 'under', 'again', 'further', 'then', 'once', 'here', 'there', 'when', 'where', 'why', 'how', 'all', 'any', 'both',  'each', 'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too','very', 's', 't', 'can', 'will', 'just', 'don', 'should', 'now'];
+const fcNamespace = 'events_fc', hibridoNamespace = 'events_hb';
+const posicoesMetricas = [3, 5, 10];
 
 export default async function handler(
     req: NextApiRequest,
@@ -20,21 +39,43 @@ export default async function handler(
                 .groupBy('avaliacao.usuario_id')
                 .having('COUNT(avaliacao.usuario_id) >= :count', { count: 10 })
                 .getRawMany();
-            let results, text = "Usuario;precision@3;precision@5;precision@10;MAP@3;MAP@5;MAP@10;MRR@3;MRR@5;MRR@10;NDCG@3;NDCG@5;NDCG@10\n";
-            let medias = [0,0,0,0,0,0,0,0,0,0,0,0], accResults = 0;
+
+            let results;
+            let textSimCosseno = "Usuario;MAP@3;MAP@5;MAP@10;MRR@3;MRR@5;MRR@10;NDCG@3;NDCG@5;NDCG@10\n";
+            let textFC = "Usuario;MAP@3;MAP@5;MAP@10;MRR@3;MRR@5;MRR@10;NDCG@3;NDCG@5;NDCG@10\n";
+            let textHib = "Usuario;MAP@3;MAP@5;MAP@10;MRR@3;MRR@5;MRR@10;NDCG@3;NDCG@5;NDCG@10\n";
+            let mediasSimCosseno =  [0,0,0,0,0,0,0,0,0], mediasFC = [0,0,0,0,0,0,0,0,0], mediasHib = [0,0,0,0,0,0,0,0,0]; 
+            let accResults = 0;
+
             for (let id of usuariosIds) {
                 results = await realizaExperimento(id.usuario_id);
                 if (results) {
                     accResults+= 1;
-                    text += `${results.usuario_id};${results.precision3};${results.precision5};${results.precision10};${results.map3};${results.map5};${results.map10};${results.mrr3};${results.mrr5};${results.mrr10};${results.ndgc3};${results.ndgc5};${results.ndgc10}\n`
-                    medias[0] +=results.precision3; medias[1] +=results.precision5; medias[2] +=results.precision10;
-                    medias[3] +=results.map3;medias[4] +=results.map5;medias[5] +=results.map10;
-                    medias[6] +=results.mrr3;medias[7] +=results.mrr5;medias[8] +=results.mrr10;
-                    medias[9] +=results.ndgc3;medias[10] +=results.ndgc5;medias[11] +=results.ndgc10;
+
+                    //textSimCosseno += `${results.usuario_id};${results.simCosseno.map3};${results.simCosseno.map5};${results.simCosseno.map10};${results.simCosseno.mrr3};${results.simCosseno.mrr5};${results.simCosseno.mrr10};${results.simCosseno.ndgc3};${results.simCosseno.ndgc5};${results.simCosseno.ndgc10}\n`
+                    mediasSimCosseno[0] +=results.simCosseno.map3; mediasSimCosseno[1] +=results.simCosseno.map5; mediasSimCosseno[2] +=results.simCosseno.map10;
+                    mediasSimCosseno[3] +=results.simCosseno.mrr3; mediasSimCosseno[4] +=results.simCosseno.mrr5; mediasSimCosseno[5] +=results.simCosseno.mrr10;
+                    mediasSimCosseno[6] +=results.simCosseno.ndgc3; mediasSimCosseno[7] +=results.simCosseno.ndgc5; mediasSimCosseno[8] +=results.simCosseno.ndgc10;
+
+                    //textFC += `${results.usuario_id};${results.fc.map3};${results.fc.map5};${results.fc.map10};${results.fc.mrr3};${results.fc.mrr5};${results.fc.mrr10};${results.fc.ndgc3};${results.fc.ndgc5};${results.fc.ndgc10}\n`
+                    mediasFC[0] +=results.fc.map3; mediasFC[1] +=results.fc.map5; mediasFC[2] +=results.fc.map10;
+                    mediasFC[3] +=results.fc.mrr3; mediasFC[4] +=results.fc.mrr5; mediasFC[5] +=results.fc.mrr10;
+                    mediasFC[6] +=results.fc.ndgc3; mediasFC[7] +=results.fc.ndgc5; mediasFC[8] +=results.fc.ndgc10;
+
+                    //textHib += `${results.usuario_id};${results.hibrido.map3};${results.hibrido.map5};${results.hibrido.map10};${results.hibrido.mrr3};${results.hibrido.mrr5};${results.hibrido.mrr10};${results.hibrido.ndgc3};${results.hibrido.ndgc5};${results.hibrido.ndgc10}\n`
+                    mediasHib[0] +=results.hibrido.map3; mediasHib[1] +=results.hibrido.map5; mediasHib[2] +=results.hibrido.map10;
+                    mediasHib[3] +=results.hibrido.mrr3; mediasHib[4] +=results.hibrido.mrr5; mediasHib[5] +=results.hibrido.mrr10;
+                    mediasHib[6] +=results.hibrido.ndgc3; mediasHib[7] +=results.hibrido.ndgc5; mediasHib[8] +=results.hibrido.ndgc10;
                 }
             }
-            text+=`Medias;${medias[0]/accResults};${medias[1]/accResults};${medias[2]/accResults};${medias[3]/accResults};${medias[4]/accResults};${medias[5]/accResults};${medias[6]/accResults};${medias[7]/accResults};${medias[8]/accResults};${medias[9]/accResults};${medias[10]/accResults};${medias[11]/accResults}`
-            fs.writeFileSync("./resultado.txt", text, 'utf-8');
+            textSimCosseno+=`Medias;${mediasSimCosseno[0]/accResults};${mediasSimCosseno[1]/accResults};${mediasSimCosseno[2]/accResults};${mediasSimCosseno[3]/accResults};${mediasSimCosseno[4]/accResults};${mediasSimCosseno[5]/accResults};${mediasSimCosseno[6]/accResults};${mediasSimCosseno[7]/accResults};${mediasSimCosseno[8]/accResults}`
+            textFC+=`Medias;${mediasFC[0]/accResults};${mediasFC[1]/accResults};${mediasFC[2]/accResults};${mediasFC[3]/accResults};${mediasFC[4]/accResults};${mediasFC[5]/accResults};${mediasFC[6]/accResults};${mediasFC[7]/accResults};${mediasFC[8]/accResults}`
+            textHib+=`Medias;${mediasHib[0]/accResults};${mediasHib[1]/accResults};${mediasHib[2]/accResults};${mediasHib[3]/accResults};${mediasHib[4]/accResults};${mediasHib[5]/accResults};${mediasHib[6]/accResults};${mediasHib[7]/accResults};${mediasHib[8]/accResults}`
+            
+            fs.writeFileSync("./metricasSimCosseno.txt", textSimCosseno, 'utf-8');
+            fs.writeFileSync("./metricasFC.txt", textFC, 'utf-8');
+            fs.writeFileSync("./mestricasHibrido.txt", textHib, 'utf-8');
+            
             res.status(200).json({ ok: "ok" });
         } else { //Faz experimento com usuário passado em parâmetro
             usuario_id = usuario_id as string;
@@ -49,7 +90,7 @@ export default async function handler(
     }
 }
 
-async function realizaExperimento(usuario_id: string): Promise<{ usuario_id: string, precision3: number, precision5: number, precision10: number, map3: number, map5: number, map10: number, mrr3: number, mrr5: number, mrr10: number, ndgc3: number, ndgc5: number, ndgc10: number } | null> {
+async function realizaExperimento(usuario_id: string): Promise<Metricas | null> {
     let eventosApreciados = await EventoRepo.createQueryBuilder("evento")
         .innerJoin(Avaliacao, 'avaliacao', 'avaliacao.evento_id = evento.id')
         .where("avaliacao.usuario_id = :userId AND avaliacao.nota >= 4 AND evento.id = avaliacao.evento_id", { userId: usuario_id })
@@ -58,6 +99,7 @@ async function realizaExperimento(usuario_id: string): Promise<{ usuario_id: str
 
     if (eventosApreciados.length != 10) {
         console.log({ resultado: `O usuário não tem ao menos 10 eventos apreciados ${eventosApreciados.length}` });
+        return null;
     } else {
         const eventosAvaliadosIds = await AvaliacaoRepo.createQueryBuilder("avaliacao")
             .select(["avaliacao.evento_id"])
@@ -94,87 +136,186 @@ async function realizaExperimento(usuario_id: string): Promise<{ usuario_id: str
                 { eventos_ids: apreciadosBaseIds, usuarioId: usuario_id })
             .getRawMany();
 
-        const recommender = new ger.GER(new ger.MemESM());
-        await recommender.initialize_namespace('events');
-        const recommenderDataSet = [];
+        //===================
+        //Similaridade cosseno
+        //====================
+        const idsResultadoSimCosseno = similaridadeCosseno(apreciadosBase, conjuntoParaRecomendacao);
+        if(idsResultadoSimCosseno.length > 9){//Continua com outros métodos se recomendar ao menos 10
+        
+            //Prepara base do GER para FC e Híbrida 
+            const recommender = new ger.GER(new ger.MemESM());
+            const fcRecommenderDataSet = []; //avaliações do usuário para FC
+            const hbRecommenderDataSet = []; //avaliações do usuário para Híbrida
 
-        for (let outrosav of avaliacoesOutros) {
-            recommenderDataSet.push({
-                namespace: 'events',
-                person: outrosav.usuario_id,
-                action: outrosav.nota >= 4 ? 'likes' : 'dislikes',
-                thing: outrosav.evento_id,
-                expires_at: Date.now() + 3600000
-            })
-        }
-        for (let usuarioAv of avaliacoesUsuario) {
-            recommenderDataSet.push({
-                namespace: 'events',
-                person: usuarioAv.usuario_id,
-                action: usuarioAv.nota >= 4 ? 'likes' : 'dislikes',
-                thing: usuarioAv.evento_id,
-                expires_at: Date.now() + 3600000
-            })
-        }
-        recommender.events(recommenderDataSet);
+            //avaliacoeOutros é comum a FC e Híbrido
+            for (let outrosav of avaliacoesOutros){
+                fcRecommenderDataSet.push({ //FC
+                    namespace: fcNamespace,
+                    person: outrosav.usuario_id,
+                    action: outrosav.nota >= 4 ? 'likes' : 'dislikes',
+                    thing: outrosav.evento_id,
+                    expires_at: Date.now() + 3600000
+                });
+                hbRecommenderDataSet.push({ //Híbrida
+                    namespace: hibridoNamespace,
+                    person: outrosav.usuario_id,
+                    action: outrosav.nota >= 4 ? 'likes' : 'dislikes',
+                    thing: outrosav.evento_id,
+                    expires_at: Date.now() + 3600000
+                });
+            }
 
-        let recsResult = (await recommender.recommendations_for_person('events', usuario_id,
-            { actions: { likes: 1, dislikes: -1 } }));
+            for (let usuarioAv of avaliacoesUsuario) {
+                fcRecommenderDataSet.push({ //FC
+                    namespace: fcNamespace,
+                    person: usuarioAv.usuario_id,
+                    action: usuarioAv.nota >= 4 ? 'likes' : 'dislikes',
+                    thing: usuarioAv.evento_id,
+                    expires_at: Date.now() + 3600000
+                });
+                hbRecommenderDataSet.push({ //Híbrida
+                    namespace: hibridoNamespace,
+                    person: usuarioAv.usuario_id,
+                    action: usuarioAv.nota >= 4 && idsResultadoSimCosseno.includes(usuarioAv.evento_id) ? 'likes' : 'dislikes',
+                    thing: usuarioAv.evento_id,
+                    expires_at: Date.now() + 3600000
+                });
+            }            
 
-        //É preciso remover do resultado os eventos do apreciadosBase, tem precisão 100% pois usuário avaliou
-        const recomendacoesLimpas = recsResult.recommendations.filter((rec: any) => !apreciadosBaseIds.includes(rec.thing));
+            await recommender.initialize_namespace(fcNamespace);
+            await recommender.initialize_namespace(hibridoNamespace);
+            recommender.events(hbRecommenderDataSet.concat(fcRecommenderDataSet));
 
-        if (recomendacoesLimpas.length < 10) {
-            console.log({ msg: "Recomendou menos de 10" });
-        } else {
-            const itensRelevantes = apreciadosParaExperimento.map(evento => evento.id);
-            const Rel = (item: string) => itensRelevantes.includes(item) ? 1 : 0;
-            /*
-            * Calcular MAP,MRR,MDCG e Precision@ para as posições 3,5 e 10
-            */
-            const posicoes = [3, 5, 10];
+            //===================
+            //Filtragem Colaborativa
+            //====================
+            const fcResult = (await recommender.recommendations_for_person(fcNamespace, usuario_id,
+                { actions: { likes: 1, dislikes: -1 } }));
+            //É preciso remover do resultado os eventos do apreciadosBase, tem precisão 100% pois usuário avaliou
+            const fcRecomendacoes = fcResult.recommendations.filter((rec: any) => !apreciadosBaseIds.includes(rec.thing));
+            if(fcRecomendacoes.length > 9){ //Continua com híbrido se recomendar ao menos 10
+                //===================
+                //Método Híbrido
+                //====================
+                const hibResult = (await recommender.recommendations_for_person(hibridoNamespace, usuario_id,
+                    { actions: { likes: 1, dislikes: -1 } })); //Não contém eventos do apreciadosBase
+                if(hibResult.length > 9){
+                    return calculaMetricas(idsResultadoSimCosseno, fcRecomendacoes, hibResult, apreciadosParaExperimento.map(evento => evento.id),usuario_id);
+                }else{return null;}
+            }else{return null;}
+        }else{ return null;}
+    }
+}
 
-            let mapsResults: number[] = [], mapSum: number;
-            let mrrResults = [];
-            let ndcgResults = [], dcgSum: number, idcgSum: number;
-            let precisions = [];
-            let accRelevantes, index = 1;
+function calculaMetricas(idsResultadoSimCosseno: string[], fcResult: any, hibResult: any, itensRelevantes : string[], usuario_id : string) : Metricas{
+    const Rel = (item: string) => itensRelevantes.includes(item) ? 1 : 0;
+    const mapsSimCosseno: number[] = [], mapsFC: number[] = [], mapsHib: number[] = [];
+    const mrrsSimCosseno: number[] = [], mrrsFC: number[] = [],  mrrsHib: number[] = [];
+    const ndcgsSimCosseno: number[] = [], ndcgsFC: number[] = [], ndcgsHib: number[] = [];
+    let mapSumSimCosseno: number, mapSumFC: number, mapSumHib: number;
+    let dcgSumSimCosseno: number, dcgSumFC: number, dcgSumHib: number;
+    let accRelSimCosseno: number, accRelFC: number, accRelHib: number; //acc relevantes encontrados
+    let idcgSum : number, index = 1;
 
-            for (let posicao of posicoes) {
-                mapSum = 0;
-                accRelevantes = 0;
-                dcgSum = 0;
-                idcgSum = 0;
-                for (let r = 1; r <= posicao; r++) //indcg constante para posicao
+    for (let posicao of posicoesMetricas) {
+        mapSumSimCosseno = mapSumFC = mapSumHib = 0;
+        dcgSumSimCosseno = dcgSumFC = dcgSumHib = 0;
+        accRelSimCosseno = accRelFC = accRelHib = 0;
+        idcgSum = 0;
+
+        for (let r = 1; r <= posicao; r++) //indcg constante para posicao
                     idcgSum += (1 / (Math.log(r + 1)));
 
-                for (let i = 0; i < posicao; i++) {
-                    if (Rel(recomendacoesLimpas[i].thing)) {
-                        accRelevantes += 1;
-                        //mAP
-                        mapSum += accRelevantes / (i + 1);
-                        //mrr
-                        if (accRelevantes == 1) //firstRelevant
-                            mrrResults.push(1 / (i + 1)); //Reciprocal Rank 3,5,10 para um único usuário
-                        //dcg
-                        dcgSum += 1 / (Math.log((i + 1) + 1));
-                    }
-                }
-                precisions.push(accRelevantes / posicao);
-                if (mrrResults.length < index) mrrResults.push(0);
-                ndcgResults.push(dcgSum / idcgSum); //NDCG 3,5,10 para um único usuário
-                mapsResults.push(mapSum / posicao); //Average Precision (AP) 3,5,10 para um único usuário
-                index++;
+        for (let i = 0; i < posicao; i++) {
+            //Métricas Cosseno
+            if (Rel(idsResultadoSimCosseno[i])) {
+                accRelSimCosseno += 1;
+                mapSumSimCosseno += accRelSimCosseno / (i + 1); //mAP
+                if (accRelSimCosseno == 1) //firstRelevant
+                    mrrsSimCosseno.push(1 / (i + 1));//mrr
+                dcgSumSimCosseno += 1 / (Math.log((i + 1) + 1)); //dgc
             }
-
-            return {
-                usuario_id, precision3: precisions[0], precision5: precisions[1], precision10: precisions[2],
-                map3: mapsResults[0], map5: mapsResults[1], map10: mapsResults[2],
-                mrr3: mrrResults[0], mrr5: mrrResults[1], mrr10: mrrResults[2],
-                ndgc3: ndcgResults[0], ndgc5: ndcgResults[1], ndgc10: ndcgResults[2]
+            //Métricas FC
+            if (Rel(fcResult[i].thing)) {
+                accRelFC += 1;
+                mapSumFC += accRelFC / (i + 1); //mAP
+                if (accRelFC == 1) //firstRelevant
+                    mrrsFC.push(1 / (i + 1));//mrr
+                dcgSumFC += 1 / (Math.log((i + 1) + 1)); //dgc
+            }
+            //Métricas Híbrido
+            if (Rel(hibResult[i].thing)) {
+                accRelHib += 1;
+                mapSumHib += accRelHib / (i + 1); //mAP
+                if (accRelHib == 1) //firstRelevant
+                 mrrsHib.push(1 / (i + 1));//mrr
+                dcgSumHib += 1 / (Math.log((i + 1) + 1)); //dgc
             }
         }
+        if (mrrsSimCosseno.length < index) mrrsSimCosseno.push(0);
+        if (mrrsFC.length < index) mrrsFC.push(0);
+        if (mrrsHib.length < index) mrrsHib.push(0);
 
+        //NDCG 3,5,10 para um único usuário
+        ndcgsSimCosseno.push(dcgSumSimCosseno / idcgSum); 
+        ndcgsFC.push(dcgSumFC / idcgSum); 
+        ndcgsHib.push(dcgSumHib / idcgSum); 
+
+        //Average Precision (AP) 3,5,10 para um único usuário
+        mapsSimCosseno.push(mapSumSimCosseno / posicao); 
+        mapsFC.push(mapSumFC / posicao); 
+        mapsHib.push(mapSumHib / posicao); 
+
+        index++;
     }
-    return null;
+
+    return {
+        usuario_id,
+        simCosseno: {
+            map3: mapsSimCosseno[0], map5: mapsSimCosseno[1], map10: mapsSimCosseno[2],
+            mrr3: mrrsSimCosseno[0], mrr5: mrrsSimCosseno[1], mrr10: mrrsSimCosseno[2],
+            ndgc3: ndcgsSimCosseno[0], ndgc5: ndcgsSimCosseno[1], ndgc10: ndcgsSimCosseno[2]
+        },
+        fc:{
+            map3: mapsFC[0], map5: mapsFC[1], map10: mapsFC[2],
+            mrr3: mrrsFC[0], mrr5: mrrsFC[1], mrr10: mrrsFC[2],
+            ndgc3: ndcgsFC[0], ndgc5: ndcgsFC[1], ndgc10: ndcgsFC[2]
+        },
+        hibrido:{
+            map3: mapsHib[0], map5: mapsHib[1], map10: mapsHib[2],
+            mrr3: mrrsHib[0], mrr5: mrrsHib[1], mrr10: mrrsHib[2],
+            ndgc3: ndcgsHib[0], ndgc5: ndcgsHib[1], ndgc10: ndcgsHib[2]
+        }
+    };
+}
+
+function similaridadeCosseno(apreciadosBase : Evento[], experimentoSet : Evento[]) : string[]{
+    let recomendados : {id: string, similaridade : number}[] = [];
+    let textoBase = "";
+    for(let apreciado of apreciadosBase)
+        textoBase += getTextoLimpo(apreciado.titulo + " " + apreciado.descricao);
+    
+    let texto2, simValue, i = 1;
+    for(let evento of experimentoSet){
+        texto2 = getTextoLimpo(evento.titulo + " " + evento.descricao)
+        simValue = Cosine.cosine.similarity(textoBase,texto2);
+        if(simValue >= 0.6)
+            recomendados.push({id: evento.id, similaridade: simValue});
+        if(i == 16 && recomendados.length == 0) //Não irá mais recomendar 10, interrompe processamento
+            return [];
+        i++;
+    }
+
+    recomendados = recomendados
+        .sort((a,b) => a.similaridade < b.similaridade? -1 : (a.similaridade == b.similaridade? 0 : 1) );
+
+    return recomendados.map(rec=> rec.id);
+}
+
+//Retorna texto sem stop words e com palavras separadas por espaço
+function getTextoLimpo(texto : string) : string{
+    texto = texto.toLowerCase();
+    let words = texto.split(" ");
+    words = words.filter((word) => !stopWords.includes(word));
+    return words.reduce((word,acc) => word + " " + acc,"");
 }
