@@ -21,7 +21,7 @@ interface Metricas{
 }
 
 const stopWords = ['i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves', 'you', 'your', 'yours', 'yourself', 'yourselves','he', 'him', 'his', 'himself', 'she', 'her', 'hers', 'herself', 'it', 'its', 'itself', 'they', 'them', 'their',  'theirs', 'themselves', 'what', 'which', 'who', 'whom', 'this', 'that', 'these', 'those', 'am', 'is', 'are', 'was',  'were', 'be', 'been', 'being', 'have', 'has', 'had', 'having', 'do', 'does', 'did', 'doing', 'a', 'an', 'the', 'and',  'but', 'if', 'or', 'because', 'as', 'until', 'while', 'of', 'at', 'by', 'for', 'with', 'about', 'against', 'between',  'into', 'through', 'during', 'before', 'after', 'above', 'below', 'to', 'from', 'up', 'down', 'in', 'out', 'on', 'off',  'over', 'under', 'again', 'further', 'then', 'once', 'here', 'there', 'when', 'where', 'why', 'how', 'all', 'any', 'both',  'each', 'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too','very', 's', 't', 'can', 'will', 'just', 'don', 'should', 'now'];
-const fcNamespace = 'events_fc', hibridoNamespace = 'events_hb';
+const fcNamespace = 'events_fc';
 const posicoesMetricas = [3, 5, 10];
 
 export default async function handler(
@@ -38,6 +38,7 @@ export default async function handler(
                 .select('avaliacao.usuario_id')
                 .groupBy('avaliacao.usuario_id')
                 .having('COUNT(avaliacao.usuario_id) >= :count', { count: 10 })
+                .limit(35)
                 .getRawMany();
 
             let results;
@@ -76,6 +77,8 @@ export default async function handler(
             fs.writeFileSync("./metricasFC.txt", textFC, 'utf-8');
             fs.writeFileSync("./mestricasHibrido.txt", textHib, 'utf-8');
             
+            console.log("\n --- " + accResults + " --- \n")
+
             res.status(200).json({ ok: "ok" });
         } else { //Faz experimento com usuário passado em parâmetro
             usuario_id = usuario_id as string;
@@ -140,15 +143,14 @@ async function realizaExperimento(usuario_id: string): Promise<Metricas | null> 
         //Similaridade cosseno
         //====================
         const idsResultadoSimCosseno = similaridadeCosseno(apreciadosBase, conjuntoParaRecomendacao);
+        
         if(idsResultadoSimCosseno.length > 9){//Continua com outros métodos se recomendar ao menos 10
         
-            //Prepara base do GER para FC e Híbrida 
+            //Prepara base do GER para FC
             const recommender = new ger.GER(new ger.MemESM());
-            const fcRecommenderDataSet = []; //avaliações do usuário para FC
-            const hbRecommenderDataSet = []; //avaliações do usuário para Híbrida
+            const fcRecommenderDataSet = [];
 
-            //avaliacoeOutros é comum a FC e Híbrido
-            for (let outrosav of avaliacoesOutros){
+            for (let outrosav of avaliacoesOutros)
                 fcRecommenderDataSet.push({ //FC
                     namespace: fcNamespace,
                     person: outrosav.usuario_id,
@@ -156,16 +158,8 @@ async function realizaExperimento(usuario_id: string): Promise<Metricas | null> 
                     thing: outrosav.evento_id,
                     expires_at: Date.now() + 3600000
                 });
-                hbRecommenderDataSet.push({ //Híbrida
-                    namespace: hibridoNamespace,
-                    person: outrosav.usuario_id,
-                    action: outrosav.nota >= 4 ? 'likes' : 'dislikes',
-                    thing: outrosav.evento_id,
-                    expires_at: Date.now() + 3600000
-                });
-            }
-
-            for (let usuarioAv of avaliacoesUsuario) {
+            
+            for (let usuarioAv of avaliacoesUsuario) 
                 fcRecommenderDataSet.push({ //FC
                     namespace: fcNamespace,
                     person: usuarioAv.usuario_id,
@@ -173,19 +167,14 @@ async function realizaExperimento(usuario_id: string): Promise<Metricas | null> 
                     thing: usuarioAv.evento_id,
                     expires_at: Date.now() + 3600000
                 });
-                hbRecommenderDataSet.push({ //Híbrida
-                    namespace: hibridoNamespace,
-                    person: usuarioAv.usuario_id,
-                    action: usuarioAv.nota >= 4 && idsResultadoSimCosseno.includes(usuarioAv.evento_id) ? 'likes' : 'dislikes',
-                    thing: usuarioAv.evento_id,
-                    expires_at: Date.now() + 3600000
-                });
-            }            
-
+            
+            //Limpa eventos do recomendador se armazenados em memória
+            if(await recommender.namespace_exists(fcNamespace))
+                await recommender.destroy_namespace(fcNamespace);
+            
             await recommender.initialize_namespace(fcNamespace);
-            await recommender.initialize_namespace(hibridoNamespace);
-            recommender.events(hbRecommenderDataSet.concat(fcRecommenderDataSet));
-
+            await recommender.events(fcRecommenderDataSet);
+            
             //===================
             //Filtragem Colaborativa
             //====================
@@ -193,12 +182,26 @@ async function realizaExperimento(usuario_id: string): Promise<Metricas | null> 
                 { actions: { likes: 1, dislikes: -1 } }));
             //É preciso remover do resultado os eventos do apreciadosBase, tem precisão 100% pois usuário avaliou
             const fcRecomendacoes = fcResult.recommendations.filter((rec: any) => !apreciadosBaseIds.includes(rec.thing));
+            
             if(fcRecomendacoes.length > 9){ //Continua com híbrido se recomendar ao menos 10
                 //===================
                 //Método Híbrido
                 //====================
-                const hibResult = (await recommender.recommendations_for_person(hibridoNamespace, usuario_id,
-                    { actions: { likes: 1, dislikes: -1 } })); //Não contém eventos do apreciadosBase
+                const hibResult = fcRecomendacoes.filter((rec : any) => idsResultadoSimCosseno.includes(rec.thing));
+                
+                // console.log("\n======AQUI======\n===Apreciados Base===")
+                // console.log(usuario_id)
+                // console.log(apreciadosBaseIds)
+        
+                // console.log("\n===Conjunto para recomendação===")
+                // console.log( conjuntoParaRecomendacao.map(ev => ev.id))
+
+                // console.log("[Filtragem COLABORATIVA]: " + fcRecomendacoes.length);
+                // fcRecomendacoes.forEach((rec:any) => console.log(rec.thing));
+    
+                // console.log("\n[Híbrido]: " + hibResult.length);
+                // hibResult.forEach((rec:any) => console.log(rec.thing));
+
                 if(hibResult.length > 9){
                     return calculaMetricas(idsResultadoSimCosseno, fcRecomendacoes, hibResult, apreciadosParaExperimento.map(evento => evento.id),usuario_id);
                 }else{return null;}
@@ -301,6 +304,7 @@ function similaridadeCosseno(apreciadosBase : Evento[], experimentoSet : Evento[
         simValue = Cosine.cosine.similarity(textoBase,texto2);
         if(simValue >= 0.6)
             recomendados.push({id: evento.id, similaridade: simValue});
+        else console.log(`[DEBUG]: Abaixo de 60%: ${simValue}`);
         if(i == 16 && recomendados.length == 0) //Não irá mais recomendar 10, interrompe processamento
             return [];
         i++;
@@ -308,6 +312,9 @@ function similaridadeCosseno(apreciadosBase : Evento[], experimentoSet : Evento[
 
     recomendados = recomendados
         .sort((a,b) => a.similaridade < b.similaridade? -1 : (a.similaridade == b.similaridade? 0 : 1) );
+
+    //console.log("\n---\n[SIMILARIDADE COSSENO]: " + recomendados.length);
+    //recomendados.forEach((rec) => console.log(`${rec.id} - ${rec.similaridade}`));
 
     return recomendados.map(rec=> rec.id);
 }
