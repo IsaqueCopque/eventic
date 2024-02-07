@@ -24,6 +24,8 @@ const stopWords = ['i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves', 
 const fcNamespace = 'events_fc';
 const posicoesMetricas = [3, 5, 10];
 
+let insuficientes = 0, poucasAvaliacoes = 0; 
+
 export default async function handler(
     req: NextApiRequest,
     res: NextApiResponse<any>
@@ -38,7 +40,8 @@ export default async function handler(
                 .select('avaliacao.usuario_id')
                 .groupBy('avaliacao.usuario_id')
                 .having('COUNT(avaliacao.usuario_id) >= :count', { count: 10 })
-                .limit(35)
+                // .limit(30)
+                // .offset(200)
                 .getRawMany();
 
             let results;
@@ -53,17 +56,17 @@ export default async function handler(
                 if (results) {
                     accResults+= 1;
 
-                    //textSimCosseno += `${results.usuario_id};${results.simCosseno.map3};${results.simCosseno.map5};${results.simCosseno.map10};${results.simCosseno.mrr3};${results.simCosseno.mrr5};${results.simCosseno.mrr10};${results.simCosseno.ndgc3};${results.simCosseno.ndgc5};${results.simCosseno.ndgc10}\n`
+                    textSimCosseno += `${results.usuario_id};${results.simCosseno.map3};${results.simCosseno.map5};${results.simCosseno.map10};${results.simCosseno.mrr3};${results.simCosseno.mrr5};${results.simCosseno.mrr10};${results.simCosseno.ndgc3};${results.simCosseno.ndgc5};${results.simCosseno.ndgc10}\n`
                     mediasSimCosseno[0] +=results.simCosseno.map3; mediasSimCosseno[1] +=results.simCosseno.map5; mediasSimCosseno[2] +=results.simCosseno.map10;
                     mediasSimCosseno[3] +=results.simCosseno.mrr3; mediasSimCosseno[4] +=results.simCosseno.mrr5; mediasSimCosseno[5] +=results.simCosseno.mrr10;
                     mediasSimCosseno[6] +=results.simCosseno.ndgc3; mediasSimCosseno[7] +=results.simCosseno.ndgc5; mediasSimCosseno[8] +=results.simCosseno.ndgc10;
 
-                    //textFC += `${results.usuario_id};${results.fc.map3};${results.fc.map5};${results.fc.map10};${results.fc.mrr3};${results.fc.mrr5};${results.fc.mrr10};${results.fc.ndgc3};${results.fc.ndgc5};${results.fc.ndgc10}\n`
+                    textFC += `${results.usuario_id};${results.fc.map3};${results.fc.map5};${results.fc.map10};${results.fc.mrr3};${results.fc.mrr5};${results.fc.mrr10};${results.fc.ndgc3};${results.fc.ndgc5};${results.fc.ndgc10}\n`
                     mediasFC[0] +=results.fc.map3; mediasFC[1] +=results.fc.map5; mediasFC[2] +=results.fc.map10;
                     mediasFC[3] +=results.fc.mrr3; mediasFC[4] +=results.fc.mrr5; mediasFC[5] +=results.fc.mrr10;
                     mediasFC[6] +=results.fc.ndgc3; mediasFC[7] +=results.fc.ndgc5; mediasFC[8] +=results.fc.ndgc10;
 
-                    //textHib += `${results.usuario_id};${results.hibrido.map3};${results.hibrido.map5};${results.hibrido.map10};${results.hibrido.mrr3};${results.hibrido.mrr5};${results.hibrido.mrr10};${results.hibrido.ndgc3};${results.hibrido.ndgc5};${results.hibrido.ndgc10}\n`
+                    textHib += `${results.usuario_id};${results.hibrido.map3};${results.hibrido.map5};${results.hibrido.map10};${results.hibrido.mrr3};${results.hibrido.mrr5};${results.hibrido.mrr10};${results.hibrido.ndgc3};${results.hibrido.ndgc5};${results.hibrido.ndgc10}\n`
                     mediasHib[0] +=results.hibrido.map3; mediasHib[1] +=results.hibrido.map5; mediasHib[2] +=results.hibrido.map10;
                     mediasHib[3] +=results.hibrido.mrr3; mediasHib[4] +=results.hibrido.mrr5; mediasHib[5] +=results.hibrido.mrr10;
                     mediasHib[6] +=results.hibrido.ndgc3; mediasHib[7] +=results.hibrido.ndgc5; mediasHib[8] +=results.hibrido.ndgc10;
@@ -75,9 +78,11 @@ export default async function handler(
             
             fs.writeFileSync("./metricasSimCosseno.txt", textSimCosseno, 'utf-8');
             fs.writeFileSync("./metricasFC.txt", textFC, 'utf-8');
-            fs.writeFileSync("./mestricasHibrido.txt", textHib, 'utf-8');
+            fs.writeFileSync("./metricasHibrido.txt", textHib, 'utf-8');
             
-            console.log("\n --- " + accResults + " --- \n")
+            console.log("\n --- Total = " + accResults + " --- ")
+            console.log("--- Avaliações insuficiente = " + poucasAvaliacoes + " ---")
+            console.log("--- Poucos Recomendados = " + insuficientes + " --- \n")
 
             res.status(200).json({ ok: "ok" });
         } else { //Faz experimento com usuário passado em parâmetro
@@ -101,7 +106,8 @@ async function realizaExperimento(usuario_id: string): Promise<Metricas | null> 
         .getMany();
 
     if (eventosApreciados.length != 10) {
-        console.log({ resultado: `O usuário não tem ao menos 10 eventos apreciados ${eventosApreciados.length}` });
+        poucasAvaliacoes += 1;
+        // console.log({ resultado: `O usuário não tem ao menos 10 eventos apreciados ${eventosApreciados.length}` });
         return null;
     } else {
         const eventosAvaliadosIds = await AvaliacaoRepo.createQueryBuilder("avaliacao")
@@ -143,7 +149,7 @@ async function realizaExperimento(usuario_id: string): Promise<Metricas | null> 
         //Similaridade cosseno
         //====================
         const idsResultadoSimCosseno = similaridadeCosseno(apreciadosBase, conjuntoParaRecomendacao);
-        
+
         if(idsResultadoSimCosseno.length > 9){//Continua com outros métodos se recomendar ao menos 10
         
             //Prepara base do GER para FC
@@ -188,25 +194,30 @@ async function realizaExperimento(usuario_id: string): Promise<Metricas | null> 
                 //Método Híbrido
                 //====================
                 const hibResult = fcRecomendacoes.filter((rec : any) => idsResultadoSimCosseno.includes(rec.thing));
-                
-                // console.log("\n======AQUI======\n===Apreciados Base===")
-                // console.log(usuario_id)
-                // console.log(apreciadosBaseIds)
-        
+                        
+                // console.log(`\n___________________\n${usuario_id}\n-------------\n`);
                 // console.log("\n===Conjunto para recomendação===")
                 // console.log( conjuntoParaRecomendacao.map(ev => ev.id))
 
+                // const appeIds = apreciadosParaExperimento.map((e) => e.id);
+
+                // console.log(`\n[Cosseno]: ${idsResultadoSimCosseno.length}`);
+                // console.log(`Quantidade relevantes = ${idsResultadoSimCosseno.filter(id => appeIds.includes(id)).length}`);
+                // console.log(idsResultadoSimCosseno);
+
                 // console.log("[Filtragem COLABORATIVA]: " + fcRecomendacoes.length);
+                // console.log(`Quantidade relevantes = ${fcRecomendacoes.filter(rec => appeIds.includes(rec.thing)).length}`);
                 // fcRecomendacoes.forEach((rec:any) => console.log(rec.thing));
     
                 // console.log("\n[Híbrido]: " + hibResult.length);
+                // console.log(`Quantidade relevantes = ${hibResult.filter(rec => appeIds.includes(rec.thing)).length}`);
                 // hibResult.forEach((rec:any) => console.log(rec.thing));
-
+                
                 if(hibResult.length > 9){
                     return calculaMetricas(idsResultadoSimCosseno, fcRecomendacoes, hibResult, apreciadosParaExperimento.map(evento => evento.id),usuario_id);
-                }else{return null;}
-            }else{return null;}
-        }else{ return null;}
+                }else{insuficientes += 1; return null;}
+            }else{insuficientes += 1; return null;}
+        }else{insuficientes += 1; return null;}
     }
 }
 
@@ -296,15 +307,16 @@ function similaridadeCosseno(apreciadosBase : Evento[], experimentoSet : Evento[
     let recomendados : {id: string, similaridade : number}[] = [];
     let textoBase = "";
     for(let apreciado of apreciadosBase)
-        textoBase += getTextoLimpo(apreciado.titulo + " " + apreciado.descricao);
+        textoBase += getTextoLimpo(apreciado.titulo);
+        // textoBase += getTextoLimpo(apreciado.titulo + " " + apreciado.descricao);
     
     let texto2, simValue, i = 1;
     for(let evento of experimentoSet){
-        texto2 = getTextoLimpo(evento.titulo + " " + evento.descricao)
+        // texto2 = getTextoLimpo(evento.titulo + " " + evento.descricao)
+        texto2 = getTextoLimpo(evento.titulo)
         simValue = Cosine.cosine.similarity(textoBase,texto2);
         if(simValue >= 0.6)
             recomendados.push({id: evento.id, similaridade: simValue});
-        else console.log(`[DEBUG]: Abaixo de 60%: ${simValue}`);
         if(i == 16 && recomendados.length == 0) //Não irá mais recomendar 10, interrompe processamento
             return [];
         i++;
