@@ -51,6 +51,11 @@ export class EventoAPI extends BaseAPI {
         return await res.json();
     }
 
+    static async getByCategoriaAndQ(inputValue: string, categoria_id : string): Promise<Evento[]>{
+        const res = await fetch(`${this.apiURL}/eventos?q=${inputValue}&categoria_id=${categoria_id}`)
+        return await res.json();
+    }
+
     /**
      *  Funcao avaliar um evento.
      * @param avaliacao 

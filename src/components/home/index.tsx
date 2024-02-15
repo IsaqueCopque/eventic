@@ -22,16 +22,22 @@ import useMediaQuery from '@mui/material/useMediaQuery';
 import { UsuarioAPI } from "@app/apis/UsuarioAPI";
 import { Categoria, EventoComRecomendacoes, PeriodosComEventosRecomendacoes } from '../../../app';
 import RecommendationSection from '../recommendationSection';
+import { EventoAPI } from "@app/apis/EventoAPI";
 
-export default function Home({ eventos, categorias, home, userId }: { eventos: EventoComRecomendacoes[], categorias: Categoria[], home: boolean, userId : string | null }) {
+const NUMERO_EVENTOS_PAGINA = 15;
 
-    const router = useRouter();
+export default function Home({ eventosData, categorias, home, userId }: { eventosData: EventoComRecomendacoes[], categorias: Categoria[], home: boolean, userId : string | null }) {
+
+    const [eventos, setEventos] = useState(eventosData);
 
     // Controla o filtro de periodo
     const [periodo, setPeriodo] = useState('1');
 
     // Controla a visualização lista/card
-    const [listView, setListView] = useState(false)
+    const [listView, setListView] = useState(false);
+
+    // Controla a categoria selecionada
+    const [categoriaSelecionada, setCategoriaSelecionada] = useState('Todas');
 
     // Controla as abas Novos/Anteriores
     const [aba, setAba] = useState('1')
@@ -40,6 +46,9 @@ export default function Home({ eventos, categorias, home, userId }: { eventos: E
 
     // Controla o valor do campo de pesquisa
     const [inputValue, setInputValue] = useState('');
+
+    // Dispara a pesquisa pelo state e effect
+    const [searchValue, setSearchValue] = useState('');
 
     // Roda a roda de loading enquanto espera o resultado da busca
     const [isLoading, setIsLoading] = useState(false);
@@ -51,15 +60,17 @@ export default function Home({ eventos, categorias, home, userId }: { eventos: E
     const [isLoadingMeusEventos, setIsLoadingMeusEventos] = useState(false);
 
     // Controla a lista de eventos inscritos
-    let [idIncricoes, setIdIncricoes] = useState<string[]>([])
+    let [idIncricoes, setIdIncricoes] = useState<string[]>([]);
 
     moment.locale('pt-br');
 
-    function ordenaEventosPorPeriodo(valorPeriodo : string) : void{
+    function ordenaEventosPorPeriodo(valorPeriodo : string, valorAba : string) : void{
         //Ordena os eventos da aba selecionada,anteriores ou posteriores
         let nomePeriodo : string;
 
-        let eventosOrdenados =  aba == '1'?
+        console.log(eventos);
+
+        let eventosOrdenados =  valorAba == '1'?
             eventos.filter(evento => new Date(evento.evento.dataInicial).getTime() >= Date.now())
             :
             eventos.filter(evento => new Date(evento.evento.dataInicial).getTime() < Date.now());
@@ -98,7 +109,7 @@ export default function Home({ eventos, categorias, home, userId }: { eventos: E
         const eventosPorPeriodos : PeriodosComEventosRecomendacoes[] = [];
         periodosMap.forEach((valor,chave) => eventosPorPeriodos.push({periodo: chave, eventosRecomendacoes: valor}));
 
-        if(aba == '1')
+        if(valorAba == '1')
             setEventosPosteriores(eventosPorPeriodos);
         else
             setEventosAnteriores(eventosPorPeriodos);
@@ -116,29 +127,63 @@ export default function Home({ eventos, categorias, home, userId }: { eventos: E
             setPeriodo(savedPeriod);
 
         //Divide por período
-        ordenaEventosPorPeriodo(savedPeriod || periodo);
+        ordenaEventosPorPeriodo(savedPeriod || periodo, aba);
         //Obtém ids dos eventos avalidos pelo usuário
         getUsuarioEventosIds();
-        // console.log(eventosAnteriores.length);
-        // console.log(eventosPosteriores.length)
     }, []);
+
+    //Mudar de categoria ou pesquisar texto
+    useEffect(() => {
+
+        const fetchEventos = async () => {
+            let eventosResponse;
+            console.log("called");
+            if(searchValue != ''){
+                console.log("By term =  " + searchValue)
+                eventosResponse = categoriaSelecionada == 'Todas'? 
+                    await EventoAPI.getByQ(searchValue)
+                    :
+                    await EventoAPI.getByCategoriaAndQ(searchValue,categoriaSelecionada);
+            }else{
+                console.log("categoria = " + categoriaSelecionada);
+                eventosResponse = categoriaSelecionada == 'Todas'? 
+                    await EventoAPI.findLast(0,NUMERO_EVENTOS_PAGINA) :  await EventoAPI.getByCategoria(categoriaSelecionada);
+            }
+            
+            const eventosComRecs : EventoComRecomendacoes[] = [];
+            let data;
+            for(let evento of eventosResponse){
+                data = userId != null?
+                    await EventoAPI.getRecomendacoes(evento.id, userId) 
+                    : 
+                    await EventoAPI.getRecomendacoes(evento.id, null);
+                eventosComRecs.push({evento: evento, recomendacoes: data})
+            }
+            setEventos(eventosComRecs);
+        }
+
+        fetchEventos();
+    }, [categoriaSelecionada, searchValue]);
+
+    useEffect(() => {
+        console.log("VAI ORDENAR")
+        ordenaEventosPorPeriodo(periodo,aba);
+    }, [eventos]);
 
     function handlePeriodChange(event: SelectChangeEvent) {
         const novoPeriodo = event.target.value;
         setPeriodo(novoPeriodo);
-        ordenaEventosPorPeriodo(novoPeriodo);
         setCookie('periodo', novoPeriodo);
     }
 
     function handleCategoriaChange(event: SelectChangeEvent) {
-        const idCategoria = event.target.value;
-        router.push(`/eventos?categoriaId=${idCategoria}`);
+        setCategoriaSelecionada(event.target.value);
     }
 
-    // Redireciona para fazer busca na api
-    const handleClick = async () => {
-        router.push(`/eventos?q=${inputValue}`);
-    };
+    function handleAbaChange(newValue : string){
+        ordenaEventosPorPeriodo(periodo, newValue);
+        setAba(newValue);
+    }
 
     //Obtém Ids dos eventos que o usuário logado se inscreveu
     const getUsuarioEventosIds = async () => {
@@ -153,13 +198,14 @@ export default function Home({ eventos, categorias, home, userId }: { eventos: E
     };
 
     function limpaBusca() {
-        setInputValue('')
+        setInputValue('');
+        setSearchValue('');
     }
 
     const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Enter') {
             e.preventDefault(); // Evita que o evento padrão de tecla Enter ocorra
-            await handleClick(); // Realiza a busca quando a tecla Enter é pressionada
+            setSearchValue(inputValue); // Realiza a busca quando a tecla Enter é pressionada
         }
     };
 
@@ -228,7 +274,7 @@ export default function Home({ eventos, categorias, home, userId }: { eventos: E
                         sx={{ display: 'flex', alignItems: 'center', padding: '1rem', }}
                     >
                         {isLoading ? <CircularProgress /> :
-                            <IconButton onClick={handleClick} type="button" aria-label="search">
+                            <IconButton onClick={() => setSearchValue(inputValue)} type="button" aria-label="search">
                                 <SearchIcon />
                             </IconButton>
                         }
@@ -272,7 +318,7 @@ export default function Home({ eventos, categorias, home, userId }: { eventos: E
                                 inputProps={{ MenuProps: { disableScrollLock: true } }}
                                 labelId="demo-simple-select-label"
                                 id="demo-simple-select"
-                                value={"Todas"}
+                                value={categoriaSelecionada}
                                 label="Categoria"
                                 onChange={handleCategoriaChange}
                             >
@@ -296,7 +342,7 @@ export default function Home({ eventos, categorias, home, userId }: { eventos: E
                    (<Box>
                         <TabContext value={aba}>
                             <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-                                <TabList onChange={(e, newValue) => { setAba(newValue) }}>
+                                <TabList onChange={(e, newValue) => { handleAbaChange(newValue) }}>
                                     <Tab label='Próximos' value='1'></Tab>
                                     <Tab label='Anteriores' value='0'></Tab>
                                 </TabList>

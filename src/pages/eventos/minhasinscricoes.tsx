@@ -8,7 +8,7 @@ import { Categoria, EventoComRecomendacoes } from '../../../app';
 import { authOptions } from "../api/auth/[...nextauth]";
 
 export default function MinhasInscricoes({ eventos, categorias, userId }: { eventos: EventoComRecomendacoes[], categorias: Categoria[], userId : string | null }) {
-  return ( <Home eventos={eventos} home={false} categorias={categorias} userId={userId}></Home> );
+  return ( <Home eventosData={eventos} home={false} categorias={categorias} userId={userId}></Home> );
 };
 
 export const getServerSideProps: GetServerSideProps = async ({query, req,res }) => {

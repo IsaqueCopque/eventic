@@ -11,7 +11,7 @@ const NUMERO_EVENTOS_PAGINA = 15;
 
 export default function HomePage({ eventos, categorias, userId }: { eventos: EventoComRecomendacoes[], categorias: Categoria[], userId : string | null }) {
     return (
-            <Home eventos={eventos} categorias={categorias} home={true} userId={userId}></Home>
+            <Home eventosData={eventos} categorias={categorias} home={true} userId={userId}></Home>
     )
 }
 
