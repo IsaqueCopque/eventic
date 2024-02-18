@@ -307,13 +307,11 @@ function similaridadeCosseno(apreciadosBase : Evento[], experimentoSet : Evento[
     let recomendados : {id: string, similaridade : number}[] = [];
     let textoBase = "";
     for(let apreciado of apreciadosBase)
-        textoBase += getTextoLimpo(apreciado.titulo);
-        // textoBase += getTextoLimpo(apreciado.titulo + " " + apreciado.descricao);
+        textoBase += getTextoLimpo(apreciado.titulo + " " + apreciado.descricao);
     
     let texto2, simValue, i = 1;
     for(let evento of experimentoSet){
-        // texto2 = getTextoLimpo(evento.titulo + " " + evento.descricao)
-        texto2 = getTextoLimpo(evento.titulo)
+        texto2 = getTextoLimpo(evento.titulo + " " + evento.descricao)
         simValue = Cosine.cosine.similarity(textoBase,texto2);
         if(simValue >= 0.6)
             recomendados.push({id: evento.id, similaridade: simValue});

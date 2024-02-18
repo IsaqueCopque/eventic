@@ -104,10 +104,10 @@ export class EventoAPI extends BaseAPI {
      * @param user_id desconsidera eventos já avaliados pelo usuário
      * @returns 
      */
-    static async getRecomendacoes(evento_id : string, usuario_id : string | null){
-        let route = `${this.apiURL}/eventos/recomendar?evento_id=${evento_id}`;
+    static async getRecomendacoes(evento_id : string, usuario_id : string | null, homePage: boolean){
+        let route = `${this.apiURL}/eventos/recomendar?evento_id=${evento_id}&home_page=${homePage? "true" : "false"}`;
         if(usuario_id != null)
-            route = route.concat(`&&usuario_id=${usuario_id}`);
+            route = route.concat(`&usuario_id=${usuario_id}`);
         const response = await fetch(route, {
             method: 'GET',
             headers: {"Content-type": "application/json; charset=UTF-8"}

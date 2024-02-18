@@ -39,9 +39,9 @@ export const getServerSideProps: GetServerSideProps = async ({query, req,res }) 
     const eventosComRecs : EventoComRecomendacoes[] = [];
     for(let evento of eventos){
         data = session != null?
-            await EventoAPI.getRecomendacoes(evento.id, session.user.id) 
+            await EventoAPI.getRecomendacoes(evento.id, session.user.id,true) 
             : 
-            await EventoAPI.getRecomendacoes(evento.id, null);
+            await EventoAPI.getRecomendacoes(evento.id, null,true);
         eventosComRecs.push({evento: evento, recomendacoes: data})
     }
 

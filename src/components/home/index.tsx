@@ -154,9 +154,9 @@ export default function Home({ eventosData, categorias, home, userId }: { evento
             let data;
             for(let evento of eventosResponse){
                 data = userId != null?
-                    await EventoAPI.getRecomendacoes(evento.id, userId) 
+                    await EventoAPI.getRecomendacoes(evento.id, userId,true) 
                     : 
-                    await EventoAPI.getRecomendacoes(evento.id, null);
+                    await EventoAPI.getRecomendacoes(evento.id, null,true);
                 eventosComRecs.push({evento: evento, recomendacoes: data})
             }
             setEventos(eventosComRecs);

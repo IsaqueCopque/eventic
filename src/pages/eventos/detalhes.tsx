@@ -230,9 +230,9 @@ export const getServerSideProps: GetServerSideProps = async ({ query, req,res })
 
   const responseData = 
   session != null?
-    await EventoAPI.getRecomendacoes(id, session.user.id) 
+    await EventoAPI.getRecomendacoes(id, session.user.id,false) 
     : 
-    await EventoAPI.getRecomendacoes(id, null);
+    await EventoAPI.getRecomendacoes(id, null,false);
   
   return {
     props: {
