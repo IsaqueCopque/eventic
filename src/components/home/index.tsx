@@ -137,15 +137,12 @@ export default function Home({ eventosData, categorias, home, userId }: { evento
 
         const fetchEventos = async () => {
             let eventosResponse;
-            console.log("called");
             if(searchValue != ''){
-                console.log("By term =  " + searchValue)
                 eventosResponse = categoriaSelecionada == 'Todas'? 
                     await EventoAPI.getByQ(searchValue)
                     :
                     await EventoAPI.getByCategoriaAndQ(searchValue,categoriaSelecionada);
             }else{
-                console.log("categoria = " + categoriaSelecionada);
                 eventosResponse = categoriaSelecionada == 'Todas'? 
                     await EventoAPI.findLast(0,NUMERO_EVENTOS_PAGINA) :  await EventoAPI.getByCategoria(categoriaSelecionada);
             }
@@ -166,7 +163,6 @@ export default function Home({ eventosData, categorias, home, userId }: { evento
     }, [categoriaSelecionada, searchValue]);
 
     useEffect(() => {
-        console.log("VAI ORDENAR")
         ordenaEventosPorPeriodo(periodo,aba);
     }, [eventos]);
 

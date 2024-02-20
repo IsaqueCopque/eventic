@@ -75,7 +75,7 @@ export default function EventCard(props: Props) {
                             id: props.id
                         }
                     }}>
-                        <Typography component="div" variant="h5">
+                        <Typography component="div" variant="h5" style={{textOverflow: 'clip', maxHeight: '80%'}}>
                             {props.title}
                         </Typography>
                     </Link>

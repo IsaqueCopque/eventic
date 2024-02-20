@@ -22,7 +22,7 @@ interface Evento {
 
 interface RecomendacaoObj{
     tipoRecomendacao: number;
-    recommendations: Evento[];
+    recomendacoes: Evento[];
 }
 
 interface EventoComRecomendacoes{

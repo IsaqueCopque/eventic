@@ -154,7 +154,9 @@ export default async function handler(
                 const eventosSet = await findEventosDiversos(15,
                     usuario_id? userModel!.map(e=>e.id).concat(evento_id) : [evento_id]
                 );
-
+                
+                // const idsRecsSimCosseno = similaridadeCosseno(usuario_id? userModel! : [evento], eventosSet, similaridadeMinima);
+                // recomendacoes = await EventoRepo.find({where: {id: In(idsRecsSimCosseno)}});
                 recomendacoes = similaridadeCosseno(usuario_id? userModel! : [evento], eventosSet, similaridadeMinima);
                 tipoRecomendacao = TipoRecomendacao.SIMLIARIDADE_COSSENO;
             }
@@ -174,111 +176,8 @@ export default async function handler(
                     tipoRecomendacao = TipoRecomendacao.SIMLIARIDADE_COSSENO_DIVERSOS;
             }
 
+            recomendacoes = await EventoRepo.find({where: {id: In(recomendacoes)}});
             res.status(200).json({recomendacoes, tipoRecomendacao});
-         
-            //OLD CODE
-
-            // // const avaliacoesEvento = await AvaliacaoRepo.find(
-            // //     {where: {evento: {id: evento_id}},
-            // //      relations: {usuario: true}
-            // //     });    
-            
-            // /*
-            // .createQueryBuilder('evento')
-            //         // .select(['DISTINCT evento.categoria_id', 'evento'])
-            //         .distinctOn(['evento.categoria_id'])
-            //         .where('evento.id NOT IN (:...ids)', { ids: skipEventosIds })
-            //         .limit(numeroEventos)
-            //         .getMany();
-            // */
-
-            // //Para todo avaliador, busca as avaliações do avaliador em outros eventos
-            // const usuariosIds = [];
-            // for(let avaliacao of avaliacoesEvento){
-            //     //@ts-ignore
-            //     usuariosIds.push(avaliacao.usuario.id);
-            // }
-            // const avaliacoesGeral = usuariosIds.length == 0?
-            //     []
-            //     :
-            //     await AvaliacaoRepo.createQueryBuilder('avaliacao')
-            //     .leftJoinAndSelect("avaliacao.evento", "evento")
-            //     .leftJoinAndSelect("avaliacao.usuario", "usuario")
-            //     .where('avaliacao.usuario_id IN (:...ids)', { ids: usuariosIds })
-            //     .limit(QT_OUTRAS_AVALIACOES) //limita outras avaliações de cada usuário
-            //     .getMany();
-
-            // // const avaliacoesGeral = await AvaliacaoRepo.find(
-            // //     {
-            // //         where: {usuario: {id: In(usuariosIds)}},
-            // //         relations: {usuario: true, evento: true}
-            // //     }
-            // // );
-
-            // //Busca eventos avaliados pelo usuário se passado id de usuário
-            // if(usuario_id){
-            //     let minimoParametro = await ParametroRepo.findOne(
-            //         {where: {nome: ParametroName.SIMILARIDADE_MIN}, select: {valor: true}
-            //     })
-            //     if(minimoParametro) similaridadeMinima = Number(minimoParametro.valor);
-            //     let avaliacoesUsuario = 
-            //     await AvaliacaoRepo.find({
-            //         where: {usuario: {id: usuario_id}},
-            //         relations: {evento: true}
-            //     });
-            //     for(let av of avaliacoesUsuario){
-            //         //@ts-ignore
-            //         eventosAvaliados.push(av.evento.id);
-            //     }
-            // }
-
-            // //similaridadeMinima = 0 se não logado
-            // const recService = new RecommendationService(evento, usuario_id,
-            //     eventosAvaliados, avaliacoesGeral, similaridadeMinima);
-            // let recIds;
-            
-            // //Evento sem avaliações e usuário logado, aplica apenas similaridade cosseno
-            // if(avaliacoesGeral.length == 0 && usuario_id){ 
-            //     let eventosDiversos = await findEventosDiversos(15,eventosAvaliados.concat(evento_id));
-            //     // console.log("==> Cosseno puro: \n -> encontra " + eventosDiversos.length + " eventos diversos")
-            //     recIds = await recService.generateRecsWithoutRatings(eventosDiversos);
-            //     tipoRecomendacao = TipoRecomendacao.SIMLIARIDADE_COSSENO;
-            // }
-            // else{ // Caso contrário, híbrido, se logado, apenas colaborativa, se deslogado
-            //     recIds = await recService.generateRecs();
-            //     tipoRecomendacao = usuario_id? TipoRecomendacao.HIBRIDA : TipoRecomendacao.FILTRAGEM_COLABORATIVA;
-            // }
-
-            // let recommendations: Evento[] = [];
-            // if(recIds.length != 0)
-            //     recommendations = await EventoRepo.find({where: {id: In(recIds)}});
-
-            // // console.log("Recomendados buscados")
-            // // let stringFin = "";
-            // // for(let ev of recommendations)
-            // //     stringFin += ev.titulo + " || ";
-            // // console.log(stringFin)
-
-            // //Se houver menos que 5 eventos recomendados, completa com categorias diversas
-            // if(recIds.length < 5){
-            //     // console.log("[DEBUG] ==> Não foram recomendados eventos suficentes. Preechendo com eventos de categorias diversas");                
-
-            //     if(recIds.length == 0)
-            //         tipoRecomendacao = TipoRecomendacao.DIVERSOS;
-            //     else if(tipoRecomendacao == TipoRecomendacao.SIMLIARIDADE_COSSENO)
-            //         tipoRecomendacao = TipoRecomendacao.SIMLIARIDADE_COSSENO_DIVERSOS;
-            //     else if(tipoRecomendacao == TipoRecomendacao.HIBRIDA)
-            //         tipoRecomendacao = TipoRecomendacao.HIBRIDA_DIVERSOS;
-            //     else
-            //         tipoRecomendacao = TipoRecomendacao.FILTRAGEM_COLABORATIVA_DIVERSOS;
-
-            //     //Desconsiderar evento atual, já avaliados e já na lista de recomendações
-            //     let skipIds = eventosAvaliados.concat(recIds);
-            //     skipIds.push(evento_id);                
-            //     recommendations = recommendations.concat(await findEventosDiversos(5-recommendations.length,skipIds));                
-            // }
-
-            // res.status(200).json({recommendations, tipoRecomendacao});
         }
         else{
             res.status(400).json({errorMsg: "Faltam parametros para gerar recomendações."})

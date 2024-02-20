@@ -15,7 +15,7 @@ export default function RecommendationSection({recommendationData, inHomePage, m
     // const [recAlredyStored, setRecAlredyStored] = useState(false);
     const [recommendationId, setRecommendationId] = useState(null);
     const tipoRecomendacao = recommendationData.tipoRecomendacao;
-    const recomendados = recommendationData.recommendations;
+    const recomendados = recommendationData.recomendacoes;
 
     const storeRec = async (nota : number) => {
         if(!recommendationId){
@@ -35,7 +35,7 @@ export default function RecommendationSection({recommendationData, inHomePage, m
         return(
             <Box sx={{ borderRadius: '0.3rem', backgroundColor: 'white', padding: '1rem', boxShadow: 3, maxHeight: "220px" }}>
                 <Typography variant="h6" gutterBottom>
-                    Eventos Similares a {mainEvent.titulo}
+                    Eventos Similares a {mainEvent.titulo + " / " + tipoRecomendacao} 
                 </Typography>
                 <Grid container spacing={3}>
                     {
@@ -67,7 +67,6 @@ export default function RecommendationSection({recommendationData, inHomePage, m
     //se na seção de detalhes do evento
     while(recomendados.length > 5)//limita a 5 eventos
         recomendados.pop()
-
     return(
         <Grid item md={12}>
             <Box sx={{ borderRadius: '0.3rem', backgroundColor: 'white', padding: '1rem', boxShadow: 3 }}>
