@@ -2,7 +2,6 @@ import { AvaliacaoRepo, EventoRepo, UsuarioRepo } from '@app/server/database';
 import { Avaliacao } from '@app/server/entities/avaliacao.entity';
 import { Evento } from '@app/server/entities/evento.entity';
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { ObjetoAvaliacao } from '../../../../app';
 import Cosine from "string-comparison"
 const ger = require('ger');
 const fs = require('fs');

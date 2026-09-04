@@ -5,7 +5,6 @@ import {SessionContextValue} from 'next-auth/react';
 import { useState, useEffect } from "react";
 import EditIcon from '@mui/icons-material/Edit';
 import RateReviewIcon from '@mui/icons-material/RateReview';
-import { AvaliacaoData, Evento } from "../../../app";
 
 export default function ReviewSection(
     {

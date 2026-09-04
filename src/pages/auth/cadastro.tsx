@@ -14,7 +14,6 @@ import { Session, getServerSession } from "next-auth";
 import { Usuario } from "@app/server/entities/usuario.entity";
 import { FormMode } from "@app/common/constants";
 import { authOptions } from "../api/auth/[...nextauth]";
-import { FormFieldState } from "../../../app";
 
 interface CadastroUsuarioProps {
   usuario?: Usuario;

@@ -2,7 +2,6 @@ import { Column, Entity, OneToMany, PrimaryGeneratedColumn, Relation, Unique } f
 import { Evento } from "@app/server/entities/evento.entity"
 import { Inscricao } from "@app/server/entities/inscricao.entity";
 import { Avaliacao } from "./avaliacao.entity";
-import type { Permissao } from "../../../app";
 
 @Entity("usuario", { schema: "public" })
 @Unique('email_unique', ['email'])

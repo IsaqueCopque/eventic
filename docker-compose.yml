@@ -34,22 +34,31 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        - DATABASE_URL=postgresql://${DB_USERNAME:-root}:${DB_PASSWORD:-root}@db:5432/ufbaeventos?schema=public
+        - DB_HOST=db
+        - DB_PORT=5432
+        - DB_NAME=ufbaeventos
+        - DB_USERNAME=${DB_USERNAME:-root}
+        - DB_PASSWORD=${DB_PASSWORD:-root}
+        - NEXT_PUBLIC_URL=${NEXT_PUBLIC_URL:-http://localhost:3000}
     depends_on:
       db:
         condition: service_healthy
     environment:
-      DB_NAME: ufbaeventos
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_USERNAME: ${DB_USERNAME:-root}
-      DB_PASSWORD: ${DB_PASSWORD:-root}
-      DEBUG: ${DEBUG:-false}
-      NODE_ENV: development
-      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:3000}
-      NEXT_PUBLIC_URL: ${NEXT_PUBLIC_URL:-http://localhost:3000}
-      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-change-this-secret}
-      SENDGRID_API_KEY: ${SENDGRID_API_KEY:-}
-      SENDGRID_EMAIL: ${SENDGRID_EMAIL:-}
+      - NODE_ENV=production
+      - DB_NAME=ufbaeventos
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USERNAME=${DB_USERNAME:-root}
+      - DB_PASSWORD=${DB_PASSWORD:-root}
+      - DATABASE_URL=postgresql://${DB_USERNAME:-root}:${DB_PASSWORD:-root}@db:5432/ufbaeventos?schema=public
+      - DEBUG=${DEBUG:-false}
+      - PUBLIC_URL=${PUBLIC_URL:-http://localhost:3000}
+      - NEXT_PUBLIC_URL=${NEXT_PUBLIC_URL:-http://localhost:3000}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-change-this-secret}
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY:-}
+      - SENDGRID_EMAIL=${SENDGRID_EMAIL:-}
     ports:
       - "${APP_PORT:-3000}:3000"
 

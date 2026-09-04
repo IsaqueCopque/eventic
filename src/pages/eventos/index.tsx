@@ -4,7 +4,6 @@ import Home from '@app/components/home';
 import { Evento } from '@app/server/entities/evento.entity';
 import { GetServerSideProps } from 'next';
 import { getServerSession } from "next-auth";
-import { Categoria, EventoComRecomendacoes } from '../../../app';
 import { authOptions } from "../api/auth/[...nextauth]";
 
 const NUMERO_EVENTOS_PAGINA = 15;

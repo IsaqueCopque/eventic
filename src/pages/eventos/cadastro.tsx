@@ -14,7 +14,6 @@ import { getServerSession } from "next-auth";
 import { juntarDataHorario, toBase64 } from "@app/helpers/Helpers";
 import { Evento } from "@app/server/entities/evento.entity";
 import { FormMode } from "@app/common/constants";
-import { FormFieldState } from "../../../app";
 
 interface CadastroEventoProps {
   evento: Evento;

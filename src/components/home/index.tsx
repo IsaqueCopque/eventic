@@ -20,7 +20,6 @@ import CircularProgress from '@mui/material/CircularProgress';
 import useMediaQuery from '@mui/material/useMediaQuery';
 
 import { UsuarioAPI } from "@app/apis/UsuarioAPI";
-import { Categoria, EventoComRecomendacoes, PeriodosComEventosRecomendacoes } from '../../../app';
 import RecommendationSection from '../recommendationSection';
 import { EventoAPI } from "@app/apis/EventoAPI";
 

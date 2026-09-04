@@ -6,7 +6,6 @@ import Image from 'next/image'
 import Link from 'next/link';
 import { RecomendacaoAPI } from '@app/apis/RecomendacaoAPI';
 import { Evento } from '@app/server/entities/evento.entity';
-import { RecomendacaoObj } from '../../../app';
 
 export default function RecommendationSection({recommendationData, inHomePage, mainEvent, userId} : 
     {recommendationData : RecomendacaoObj, inHomePage : boolean, mainEvent : Evento, userId : string}){

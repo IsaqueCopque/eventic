@@ -1,5 +1,4 @@
 import { Evento } from '@app/server/entities/evento.entity';
-import { AvaliacaoData, AvaliacaoPostRequest, EventoPostRequest, EventoPutRequest } from '../../app';
 import { BaseAPI } from './BaseAPI';
 
 export class EventoAPI extends BaseAPI {

@@ -1,4 +1,3 @@
-import { UsuarioPostRequest, UsuarioPutRequest } from "../../app";
 import { BaseAPI } from "./BaseAPI";
 
 export class UsuarioAPI extends BaseAPI {

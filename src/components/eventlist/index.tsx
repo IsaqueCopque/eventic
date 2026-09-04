@@ -13,7 +13,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 
 interface Props {
     id: string
-    initialDate: Date
+    initialDate: Date | string
     title: string
     location: string
     subscribeButton: boolean
